@@ -115,7 +115,7 @@ struct RootView: View {
                 NavigationLink(value: set) {
                     SetRow(set: set)
                 }
-                .transition(.move(edge: .top).combined(with: .opacity))
+                .plainRow()
                 .swipeActions(edge: .leading) {
                     Button {
                         Haptics.selection()
@@ -134,7 +134,6 @@ struct RootView: View {
                         Label("삭제", systemImage: "trash")
                     }
                 }
-                .plainRow()
             }
         }
         .listStyle(.plain)
@@ -259,5 +258,8 @@ private struct SetRow: View {
         }
         .padding(16)
         .glassPanel(corner: 24)
+        // Flatten the hit region back to a plain rectangle. The glass container
+        // shapes its own, which can leave the row's swipe area ill-defined.
+        .contentShape(Rectangle())
     }
 }
