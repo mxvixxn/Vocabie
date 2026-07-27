@@ -163,6 +163,8 @@ struct WordStage: View {
     var size: CGFloat = 38
     /// Draws a hint of a card stack behind the word so 암기 still reads as flippable.
     var stacked: Bool = false
+    /// English text to pronounce. `nil` hides the speaker button.
+    var speaks: String?
 
     var body: some View {
         ZStack {
@@ -181,6 +183,10 @@ struct WordStage: View {
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.45)
                     .lineLimit(3)
+
+                if let speaks, !speaks.trimmed.isEmpty {
+                    SpeakButton(text: speaks, accent: accent)
+                }
 
                 if showsChrome && !note.isEmpty {
                     Text(note)
@@ -210,6 +216,31 @@ struct WordStage: View {
                 .scaleEffect(0.94)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Small inline button that pronounces a word, like the speaker in Translate.
+struct SpeakButton: View {
+    let text: String
+    let accent: Color
+
+    // Read directly — @Observable tracks the property access inside `body`.
+    private var speaker: Speaker { Speaker.shared }
+
+    var body: some View {
+        Button {
+            Haptics.soft()
+            speaker.speak(text)
+        } label: {
+            Image(systemName: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(accent)
+                .symbolEffect(.variableColor.iterative, isActive: speaker.isSpeaking)
+                .frame(width: 42, height: 34)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("발음 듣기")
     }
 }
 

@@ -94,11 +94,17 @@ struct SpellView: View {
             Text("정답")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            Text(session.expectedAnswer)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(Theme.spell)
-                .lineLimit(2)
-                .minimumScaleFactor(0.7)
+            HStack(spacing: 4) {
+                Text(session.expectedAnswer)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(Theme.spell)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                // The answer is the English term when spelling from a meaning.
+                if session.direction == .meaningToTerm {
+                    SpeakButton(text: session.expectedAnswer, accent: Theme.spell)
+                }
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)

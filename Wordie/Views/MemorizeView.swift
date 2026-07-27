@@ -9,12 +9,19 @@ struct MemorizeView: View {
     let cards: [Vocab]
     let direction: StudyDirection
 
+    @AppStorage("autoSpeak") private var autoSpeak = true
+
     @State private var index = 0
     @State private var revealed = false
     @State private var finished = false
 
     private var current: Vocab? {
         cards.indices.contains(index) ? cards[index] : nil
+    }
+
+    /// The English term is on screen when the term side is the one showing.
+    private var termVisible: Bool {
+        direction == .termToMeaning ? !revealed : revealed
     }
 
     private var progress: Double {
@@ -57,6 +64,8 @@ struct MemorizeView: View {
                 }
             }
         }
+        .onAppear { speakIfNeeded() }
+        .onDisappear { Speaker.shared.stop() }
     }
 
     private var stage: some View {
@@ -72,12 +81,15 @@ struct MemorizeView: View {
             note: revealed ? (card?.note ?? "") : "탭하면 정답이 보여요",
             accent: Theme.memorize,
             size: 40,
-            stacked: true
+            stacked: true,
+            // Only offer pronunciation while the English term is the side on screen.
+            speaks: termVisible ? card?.term : nil
         )
         .contentShape(Rectangle())
         .onTapGesture {
             Haptics.soft()
             withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { revealed.toggle() }
+            speakIfNeeded()
         }
         .gesture(
             DragGesture(minimumDistance: 40)
@@ -90,6 +102,12 @@ struct MemorizeView: View {
         .transition(.opacity)
     }
 
+    /// Reads the term aloud whenever it becomes the visible side.
+    private func speakIfNeeded() {
+        guard autoSpeak, termVisible, let term = current?.term else { return }
+        Speaker.shared.speak(term)
+    }
+
     // MARK: Navigation
 
     private func next() {
@@ -99,10 +117,12 @@ struct MemorizeView: View {
 
         if index >= cards.count - 1 {
             Haptics.success()
+            Speaker.shared.stop()
             withAnimation { finished = true }
         } else {
             revealed = false
             withAnimation(.easeInOut(duration: 0.18)) { index += 1 }
+            speakIfNeeded()
         }
     }
 
@@ -110,11 +130,13 @@ struct MemorizeView: View {
         guard index > 0 else { return }
         revealed = false
         withAnimation(.easeInOut(duration: 0.18)) { index -= 1 }
+        speakIfNeeded()
     }
 
     private func restart() {
         index = 0
         revealed = false
         finished = false
+        speakIfNeeded()
     }
 }

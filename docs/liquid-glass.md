@@ -81,3 +81,39 @@ GlassEffectContainer(spacing: 20) { ... }
 ## 접근성
 
 설정 → 손쉬운 사용 → **투명도 줄이기**를 켠 사용자에게는 시스템이 유리를 자동으로 불투명 처리한다. 순정 `glassEffect`를 쓰는 이유 중 하나다. 커스텀 재질로 만들면 이 대응이 깨진다.
+
+---
+
+# 발음 듣기 (TTS)
+
+`Wordie/Audio/Speaker.swift` — `AVSpeechSynthesizer` 기반. 애플 번역·VoiceOver와 **같은 시스템 음성**을 쓴다. 무료·오프라인·서버 불필요.
+
+## 무음 스위치 대응
+
+기본 상태에서는 합성 음성이 벨소리 스위치를 따라간다. 즉 **무음 모드면 아무 소리도 안 난다.** 이걸 뚫는 게 오디오 세션 카테고리다.
+
+```swift
+try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+try session.setActive(true)
+```
+
+- `.playback` — 무음 스위치를 무시하고 재생
+- `.duckOthers` — 배경 음악을 끄지 않고 잠깐 줄임 (음악 들으며 공부 가능)
+- 발화가 끝나면 `setActive(false, options: [.notifyOthersOnDeactivation])`로 세션을 놓아줘야 음악 볼륨이 원래대로 돌아온다
+
+## 음성 품질
+
+기본 음성은 평범하다. 사용자가 **설정 → 손쉬운 사용 → 음성 콘텐츠**에서 향상된/프리미엄 음성을 받아두면 `Speaker.bestVoice(for:)`가 자동으로 그걸 고른다 (품질 premium > enhanced > default 순).
+
+`Speaker.hasUpgradedVoice(for:)`로 업그레이드 음성 보유 여부를 알 수 있다. 아직 UI에 안 붙였다 — 나중에 "더 자연스러운 발음 받기" 안내에 쓸 것.
+
+## 한계
+
+단어 하나만 읽히면 문맥이 없어 동형이의어를 틀리게 읽는다: `read`, `lead`, `live`, `bow`, `tear`. TTS의 구조적 한계라 우회가 어렵다. 해당 단어는 메모 필드에 발음을 적어두는 정도가 현실적이다.
+
+## 붙인 위치
+
+- **암기** — 영단어가 보이는 면일 때만 스피커 버튼 노출. 카드 넘길 때 자동 재생 (`@AppStorage("autoSpeak")`, 기본 켜짐, 단어장 메뉴에서 토글)
+- **스펠** — 정답 공개 시 (뜻→단어 방향일 때만)
+- **단어 목록** — 각 행에 스피커 버튼
+- **리콜** — 안 붙임. 4지선다 중 정답을 소리로 알려주면 문제가 성립하지 않는다

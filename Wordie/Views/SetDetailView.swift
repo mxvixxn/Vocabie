@@ -8,6 +8,8 @@ struct SetDetailView: View {
 
     @Bindable var set: VocabSet
 
+    @AppStorage("autoSpeak") private var autoSpeak = true
+
     @State private var direction: StudyDirection = .termToMeaning
     @State private var showingImport = false
     @State private var showingAddOne = false
@@ -41,6 +43,10 @@ struct SetDetailView: View {
                     }
                     Button { showingAddOne = true } label: {
                         Label("단어 하나 추가", systemImage: "plus")
+                    }
+                    Divider()
+                    Toggle(isOn: $autoSpeak) {
+                        Label("카드 넘길 때 발음 듣기", systemImage: "speaker.wave.2")
                     }
                 } label: {
                     Image(systemName: "plus.circle.fill").font(.title3)
@@ -197,6 +203,18 @@ private struct WordRow: View {
                 Text(word.meaning).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            Button {
+                Haptics.soft()
+                Speaker.shared.speak(word.term)
+            } label: {
+                Image(systemName: "speaker.wave.2")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(word.term) 발음 듣기")
             HStack(spacing: 2) {
                 ForEach(0..<3, id: \.self) { i in
                     Image(systemName: i < word.starRating ? "star.fill" : "star")
