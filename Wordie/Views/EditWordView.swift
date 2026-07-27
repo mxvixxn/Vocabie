@@ -65,8 +65,9 @@ struct EditWordView: View {
         } else {
             let order = (set.words.map(\.order).max() ?? -1) + 1
             let vocab = Vocab(term: term.trimmed, meaning: meaning.trimmed, note: note.trimmed, order: order)
-            vocab.set = set
+            // Insert before relating — see ImportWordsView.commit().
             context.insert(vocab)
+            vocab.set = set
         }
         set.touch()
         try? context.save()

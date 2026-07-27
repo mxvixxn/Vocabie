@@ -45,9 +45,13 @@ struct ImportWordsView: View {
             ) { result in
                 handleFileImport(result)
             }
-            .alert("파일을 읽을 수 없어요",
-                   isPresented: .constant(importError != nil)) {
-                Button("확인") { importError = nil }
+            // A real two-way binding — `.constant` leaves SwiftUI unable to dismiss
+            // the alert itself, which can strand it on screen.
+            .alert("파일을 읽을 수 없어요", isPresented: Binding(
+                get: { importError != nil },
+                set: { if !$0 { importError = nil } }
+            )) {
+                Button("확인", role: .cancel) { importError = nil }
             } message: {
                 Text(importError ?? "")
             }
@@ -146,8 +150,11 @@ struct ImportWordsView: View {
                 note: row.note,
                 order: startOrder + offset
             )
-            vocab.set = set
+            // Register with the context *before* wiring the relationship. Relating a
+            // not-yet-inserted object to a persisted one is unreliable in SwiftData —
+            // the row can silently fail to attach to the set.
             context.insert(vocab)
+            vocab.set = set
         }
         set.touch()
         try? context.save()

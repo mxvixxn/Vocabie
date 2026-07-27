@@ -9,6 +9,8 @@ struct RootView: View {
 
     @State private var showingNewSet = false
     @State private var showingReview = false
+    /// Set awaiting delete confirmation. Deleting takes its words with it, so we ask.
+    @State private var pendingDeletion: VocabSet?
 
     /// Every card across every set whose review date has arrived, hardest first.
     private var dueCards: [Vocab] {
@@ -46,8 +48,33 @@ struct RootView: View {
             .sheet(isPresented: $showingReview) {
                 ReviewStartView(dueCards: dueCards)
             }
+            .confirmationDialog(
+                "‘\(pendingDeletion?.title ?? "")’을(를) 삭제할까요?",
+                isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    set: { if !$0 { pendingDeletion = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("삭제", role: .destructive) { deletePendingSet() }
+                Button("취소", role: .cancel) { pendingDeletion = nil }
+            } message: {
+                if let set = pendingDeletion {
+                    Text("단어 \(set.wordCount)개와 학습 기록이 함께 사라져요. 되돌릴 수 없어요.")
+                }
+            }
         }
         .tint(Theme.tint)
+    }
+
+    private func deletePendingSet() {
+        guard let set = pendingDeletion else { return }
+        // Clear the reference first so the dialog stops reading a deleted object.
+        pendingDeletion = nil
+        // Vocab has a cascade delete rule, so its words go with it.
+        context.delete(set)
+        try? context.save()
+        Haptics.nudge()
     }
 
     private var setList: some View {
@@ -68,6 +95,13 @@ struct RootView: View {
                         SetRow(set: set)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            pendingDeletion = set
+                        } label: {
+                            Label("단어장 삭제", systemImage: "trash")
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 16)

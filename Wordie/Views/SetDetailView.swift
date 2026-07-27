@@ -5,6 +5,7 @@ import SwiftData
 struct SetDetailView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dismiss) private var dismiss
 
     @Bindable var set: VocabSet
 
@@ -14,6 +15,9 @@ struct SetDetailView: View {
     @State private var showingImport = false
     @State private var showingAddOne = false
     @State private var activeMode: StudyMode?
+    @State private var showingRename = false
+    @State private var confirmingDelete = false
+    @State private var draftTitle = ""
 
     var body: some View {
         ZStack {
@@ -48,8 +52,18 @@ struct SetDetailView: View {
                     Toggle(isOn: $autoSpeak) {
                         Label("카드 넘길 때 발음 듣기", systemImage: "speaker.wave.2")
                     }
+                    Divider()
+                    Button {
+                        draftTitle = set.title
+                        showingRename = true
+                    } label: {
+                        Label("이름 변경", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) { confirmingDelete = true } label: {
+                        Label("단어장 삭제", systemImage: "trash")
+                    }
                 } label: {
-                    Image(systemName: "plus.circle.fill").font(.title3)
+                    Image(systemName: "ellipsis.circle.fill").font(.title3)
                 }
             }
         }
@@ -58,6 +72,21 @@ struct SetDetailView: View {
         }
         .sheet(isPresented: $showingAddOne) {
             EditWordView(set: set, word: nil)
+        }
+        .alert("이름 변경", isPresented: $showingRename) {
+            TextField("단어장 이름", text: $draftTitle)
+            Button("취소", role: .cancel) { }
+            Button("저장") { renameSet() }
+        }
+        .confirmationDialog(
+            "‘\(set.title)’을(를) 삭제할까요?",
+            isPresented: $confirmingDelete,
+            titleVisibility: .visible
+        ) {
+            Button("삭제", role: .destructive) { deleteSet() }
+            Button("취소", role: .cancel) { }
+        } message: {
+            Text("단어 \(set.wordCount)개와 학습 기록이 함께 사라져요. 되돌릴 수 없어요.")
         }
         .fullScreenCover(item: $activeMode) { mode in
             studyView(for: mode)
@@ -147,6 +176,32 @@ struct SetDetailView: View {
         .padding(20)
         .glassPanel(corner: 24)
         .padding(.top, 30)
+    }
+
+    // MARK: Set management
+
+    private func renameSet() {
+        let title = draftTitle.trimmed
+        guard !title.isEmpty else { return }
+        set.title = title
+        set.touch()
+        try? context.save()
+        Haptics.success()
+    }
+
+    private func deleteSet() {
+        // Leave the screen *before* deleting. This view binds to `set`, so deleting
+        // while it is still on screen means one more render against a torn-down
+        // object — navigation title, word list and all.
+        Haptics.nudge()
+        dismiss()
+
+        let doomed = set
+        Task {
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            context.delete(doomed)   // words cascade with it
+            try? context.save()
+        }
     }
 
     @ViewBuilder

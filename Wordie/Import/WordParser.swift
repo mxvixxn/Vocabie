@@ -177,7 +177,9 @@ enum WordParser {
         guard let range = line.range(of: sep) else { return nil }
         let term = String(line[..<range.lowerBound]).trimmed
         let meaning = String(line[range.upperBound...]).trimmed
-        guard !term.isEmpty else { return nil }
+        // Both halves must carry something. Returning a half-empty row here would
+        // stop `autoSplit` from trying the next separator and the line would vanish.
+        guard !term.isEmpty, !meaning.isEmpty else { return nil }
         return ParsedRow(term: term, meaning: meaning)
     }
 
@@ -195,7 +197,7 @@ enum WordParser {
         var fields: [String] = []
         var current = ""
         var inQuotes = false
-        var chars = Array(line)
+        let chars = Array(line)
         var i = 0
         while i < chars.count {
             let c = chars[i]
