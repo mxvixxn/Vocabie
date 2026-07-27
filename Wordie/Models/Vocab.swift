@@ -62,6 +62,14 @@ final class Vocab {
 }
 
 extension Vocab {
+    /// Key used to decide whether two cards are "the same word" — case- and
+    /// whitespace-insensitive on the term. Used to spot duplicates when adding words.
+    static func dedupKey(_ term: String) -> String {
+        term.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    var dedupKey: String { Vocab.dedupKey(term) }
+
     /// Overall mastery, 0...3 stars.
     /// One star for having been seen, one for a recall streak, one for a spell streak.
     var starRating: Int {

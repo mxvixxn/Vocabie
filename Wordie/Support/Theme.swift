@@ -18,6 +18,7 @@ enum Theme {
     static let recall = Color(red: 0.58, green: 0.47, blue: 0.94)    // 리콜 — violet
     static let spell = Color(red: 0.36, green: 0.66, blue: 0.72)     // 스펠 — teal
     static let correct = Color(red: 0.36, green: 0.72, blue: 0.55)
+    static let wrong = Color(red: 0.91, green: 0.35, blue: 0.38)
     static let star = Color(red: 0.98, green: 0.78, blue: 0.36)
 
     /// The soft sky backdrop. Everything else floats above this.
@@ -88,6 +89,12 @@ enum Haptics {
     static func soft() {
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        #endif
+    }
+    /// A firm single tap — the "뚝" when a Memorize card is flipped.
+    static func rigid() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         #endif
     }
     /// Used for a missed answer. Deliberately gentle — a miss is not a punishment.

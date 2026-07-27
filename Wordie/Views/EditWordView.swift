@@ -13,6 +13,7 @@ struct EditWordView: View {
     @State private var term = ""
     @State private var meaning = ""
     @State private var note = ""
+    @State private var showingDuplicatePrompt = false
 
     private var isEditing: Bool { word != nil }
 
@@ -54,6 +55,16 @@ struct EditWordView: View {
                     note = word.note
                 }
             }
+            .confirmationDialog(
+                "이미 있는 단어예요",
+                isPresented: $showingDuplicatePrompt,
+                titleVisibility: .visible
+            ) {
+                Button("그래도 추가") { addNew() }
+                Button("취소", role: .cancel) { }
+            } message: {
+                Text("‘\(term.trimmed)’은(는) 이미 단어장에 있어요. 그래도 추가할까요?")
+            }
         }
     }
 
@@ -62,13 +73,27 @@ struct EditWordView: View {
             word.term = term.trimmed
             word.meaning = meaning.trimmed
             word.note = note.trimmed
-        } else {
-            let order = (set.words.map(\.order).max() ?? -1) + 1
-            let vocab = Vocab(term: term.trimmed, meaning: meaning.trimmed, note: note.trimmed, order: order)
-            // Insert before relating — see ImportWordsView.commit().
-            context.insert(vocab)
-            vocab.set = set
+            set.touch()
+            try? context.save()
+            Haptics.success()
+            dismiss()
+            return
         }
+        // Adding a new card — warn if the term is already in the set.
+        let key = Vocab.dedupKey(term)
+        if set.words.contains(where: { $0.dedupKey == key }) {
+            showingDuplicatePrompt = true
+        } else {
+            addNew()
+        }
+    }
+
+    private func addNew() {
+        let order = (set.words.map(\.order).max() ?? -1) + 1
+        let vocab = Vocab(term: term.trimmed, meaning: meaning.trimmed, note: note.trimmed, order: order)
+        // Insert before relating — see ImportWordsView.insert().
+        context.insert(vocab)
+        vocab.set = set
         set.touch()
         try? context.save()
         Haptics.success()

@@ -14,6 +14,9 @@ struct ImportWordsView: View {
     @State private var swapColumns = false
     @State private var showingFileImporter = false
     @State private var importError: String?
+    /// Rows whose term already exists in the set, held while we ask what to do.
+    @State private var duplicateRows: [ParsedRow] = []
+    @State private var showingDuplicatePrompt = false
 
     private var rows: [ParsedRow] {
         WordParser.parse(rawText, delimiter: delimiter, swapColumns: swapColumns)
@@ -54,6 +57,17 @@ struct ImportWordsView: View {
                 Button("확인", role: .cancel) { importError = nil }
             } message: {
                 Text(importError ?? "")
+            }
+            .confirmationDialog(
+                "이미 있는 단어 \(duplicateRows.count)개",
+                isPresented: $showingDuplicatePrompt,
+                titleVisibility: .visible
+            ) {
+                Button("건너뛰고 새 단어만 추가") { commit(includingDuplicates: false) }
+                Button("중복 포함해 모두 추가") { commit(includingDuplicates: true) }
+                Button("취소", role: .cancel) { }
+            } message: {
+                Text("\(duplicateSummary)\n이미 단어장에 있는 단어예요. 어떻게 할까요?")
             }
         }
     }
@@ -141,9 +155,44 @@ struct ImportWordsView: View {
 
     // MARK: Actions
 
+    /// Terms already in the set, for spotting duplicates.
+    private var existingKeys: Set<String> {
+        Set(set.words.map(\.dedupKey))
+    }
+
+    /// A short, human-readable list of the duplicate terms (first few).
+    private var duplicateSummary: String {
+        let names = duplicateRows.prefix(5).map(\.term)
+        let more = duplicateRows.count - names.count
+        return names.joined(separator: ", ") + (more > 0 ? " 외 \(more)개" : "")
+    }
+
+    /// Entry point from the "추가" button: ask first if anything is a duplicate.
     private func commit() {
+        let keys = existingKeys
+        let dupes = rows.filter { keys.contains(Vocab.dedupKey($0.term)) }
+        if dupes.isEmpty {
+            insert(rows)
+        } else {
+            duplicateRows = dupes
+            showingDuplicatePrompt = true
+        }
+    }
+
+    /// Resolve the duplicate prompt: add everything, or only the new words.
+    private func commit(includingDuplicates: Bool) {
+        if includingDuplicates {
+            insert(rows)
+        } else {
+            let keys = existingKeys
+            insert(rows.filter { !keys.contains(Vocab.dedupKey($0.term)) })
+        }
+    }
+
+    private func insert(_ rowsToAdd: [ParsedRow]) {
+        guard !rowsToAdd.isEmpty else { dismiss(); return }
         let startOrder = (set.words.map(\.order).max() ?? -1) + 1
-        for (offset, row) in rows.enumerated() {
+        for (offset, row) in rowsToAdd.enumerated() {
             let vocab = Vocab(
                 term: row.term,
                 meaning: row.meaning,

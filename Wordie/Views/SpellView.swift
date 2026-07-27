@@ -85,7 +85,7 @@ struct SpellView: View {
         switch phase {
         case .typing:  Color.primary.opacity(0.06)
         case .correct: Theme.correct.opacity(0.25)
-        case .missed:  Color.orange.opacity(0.16)
+        case .missed:  Theme.wrong.opacity(0.16)   // a soft red says "not quite"
         }
     }
 
@@ -138,11 +138,13 @@ struct SpellView: View {
         guard phase == .typing else { return }
         let ok = SpellNormalizer.matches(answer: typed, expected: session.expectedAnswer)
         withAnimation(.easeInOut(duration: 0.2)) { phase = ok ? .correct : .missed }
-        ok ? Haptics.success() : Haptics.nudge()
+        // 따닥 on a hit, 따다닥 (FaceID-fail) on a miss.
+        ok ? Haptics.success() : Haptics.intenseError()
 
         if ok {
+            // Hold the green long enough to clearly register the win before moving on.
             Task {
-                try? await Task.sleep(nanoseconds: 550_000_000)
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
                 if phase == .correct { proceed() }
             }
         }

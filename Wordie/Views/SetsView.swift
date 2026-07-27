@@ -1,25 +1,20 @@
 import SwiftUI
 import SwiftData
 
-/// Home screen: the list of study sets (단어장).
-struct RootView: View {
+/// 세트 tab: the list of study sets (단어장) — create, rename, delete.
+struct SetsView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
     @Query(sort: \VocabSet.updatedAt, order: .reverse) private var sets: [VocabSet]
 
     @State private var showingNewSet = false
-    @State private var showingReview = false
     /// Set awaiting delete confirmation. Deleting takes its words with it, so we ask.
     @State private var pendingDeletion: VocabSet?
     /// Set being renamed from the leading swipe.
     @State private var renameTarget: VocabSet?
     @State private var draftTitle = ""
 
-    /// Every card across every set whose review date has arrived, hardest first.
-    private var dueCards: [Vocab] {
-        sets.flatMap { $0.dueWords() }
-            .sorted { $0.lapses > $1.lapses }
-    }
+    @AppStorage("wordie.hasSeenSwipeTutorial") private var hasSeenSwipeTutorial = false
 
     var body: some View {
         NavigationStack {
@@ -32,7 +27,7 @@ struct RootView: View {
                     setList
                 }
             }
-            .navigationTitle("Wordie")
+            .navigationTitle("단어장")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -47,9 +42,6 @@ struct RootView: View {
             }
             .sheet(isPresented: $showingNewSet) {
                 NewSetView()
-            }
-            .sheet(isPresented: $showingReview) {
-                ReviewStartView(dueCards: dueCards)
             }
             .confirmationDialog(
                 "‘\(pendingDeletion?.title ?? "")’을(를) 삭제할까요?",
@@ -76,6 +68,14 @@ struct RootView: View {
             }
         }
         .tint(Theme.tint)
+        .overlay {
+            if !hasSeenSwipeTutorial {
+                SwipeTutorialView {
+                    withAnimation(.easeInOut(duration: 0.25)) { hasSeenSwipeTutorial = true }
+                }
+                .transition(.opacity)
+            }
+        }
     }
 
     private func deletePendingSet() {
@@ -100,21 +100,11 @@ struct RootView: View {
 
     private var setList: some View {
         List {
-            if !dueCards.isEmpty {
-                Button {
-                    Haptics.soft()
-                    showingReview = true
-                } label: {
-                    ReviewBanner(count: dueCards.count)
-                }
-                .buttonStyle(.plain)
-                .plainRow()
-            }
-
             ForEach(sets) { set in
                 NavigationLink(value: set) {
                     SetRow(set: set)
                 }
+                .navigationLinkIndicatorVisibility(.hidden)
                 .plainRow()
                 .swipeActions(edge: .leading) {
                     Button {
@@ -178,36 +168,6 @@ private extension View {
         listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
             .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-    }
-}
-
-/// Sits above the set list whenever cards have come due.
-private struct ReviewBanner: View {
-    let count: Int
-
-    var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle().fill(Theme.tint.gradient)
-                    .frame(width: 46, height: 46)
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("오늘의 복습")
-                    .font(.headline)
-                Text("\(count)개 단어가 복습할 때가 됐어요")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(14)
-        .glassPanel(corner: 24, tint: Theme.tint)
     }
 }
 

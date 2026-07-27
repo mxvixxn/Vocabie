@@ -16,7 +16,7 @@ struct WordieApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            MainTabView()
         }
         .modelContainer(container)
     }

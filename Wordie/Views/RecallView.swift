@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 리콜 (Recall): pick the correct answer from four choices.
 ///
-/// Missing is not punished — there is no ✗ and no red. The right answer simply lights up,
-/// the card slides to the back of the queue, and it comes around again later.
+/// On a miss the tapped choice turns red and the correct one still lights green, so the
+/// learner sees both. The missed card slides to the back of the queue and comes around again.
 struct RecallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
@@ -67,15 +67,17 @@ struct RecallView: View {
     // MARK: Feedback
 
     private func fill(for option: String) -> Color? {
-        guard selected != nil else { return nil }
+        guard let selected else { return nil }
         if option == session.expectedAnswer { return Theme.correct.opacity(0.9) }
-        // The miss just fades back rather than turning red.
+        // The wrong choice the learner actually tapped turns red.
+        if option == selected { return Theme.wrong.opacity(0.9) }
         return Color.primary.opacity(0.03)
     }
 
     private func foreground(for option: String) -> Color? {
-        guard selected != nil else { return nil }
+        guard let selected else { return nil }
         if option == session.expectedAnswer { return .white }
+        if option == selected { return .white }
         return .secondary
     }
 
@@ -85,7 +87,8 @@ struct RecallView: View {
         guard !locked else { return }
         let isCorrect = option == session.expectedAnswer
         selected = option
-        isCorrect ? Haptics.success() : Haptics.nudge()
+        // 따닥 on a hit, 따다닥 (FaceID-fail) on a miss.
+        isCorrect ? Haptics.success() : Haptics.intenseError()
 
         // Hold the highlight so the answer registers, then let the session move on.
         let delay: UInt64 = isCorrect ? 450_000_000 : 950_000_000
