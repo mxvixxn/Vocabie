@@ -114,8 +114,10 @@ enum WordParser {
         // (and the swap toggle) handle it.
         guard firstHangul != line.startIndex else { return nil }
 
-        // Korean glosses are often written with a placeholder tilde — "~을 복습하다".
-        // That tilde belongs to the meaning, so pull the boundary back over it.
+        // A gloss often opens with punctuation that belongs to the meaning rather than
+        // the term — a placeholder tilde ("~을 복습하다") or a bracketed qualifier
+        // ("(놓여)있다", "(온도 단위인)도"). Without this the boundary lands *inside*
+        // the bracket and the term keeps a stray "(".
         var boundary = firstHangul
         while boundary > line.startIndex {
             let prior = line.index(before: boundary)
@@ -135,8 +137,13 @@ enum WordParser {
     /// Trailing junk left between the two columns.
     private static let separatorTrim = CharacterSet(charactersIn: " \t-–—―:=,;·••|/\\>")
 
-    /// Placeholder marks that open a Korean gloss rather than close the term.
-    private static let placeholders: Set<Character> = ["~", "∼", "〜", "～"]
+    /// Marks that open a Korean gloss rather than close the term, so the split point
+    /// belongs before them, not after.
+    private static let placeholders: Set<Character> = [
+        "~", "∼", "〜", "～",                          // placeholder tilde
+        "(", "[", "{", "（", "［", "｛", "〔", "「", "『",  // bracketed qualifier
+        "\u{201C}", "\u{2018}",                        // smart quotes
+    ]
 
     // MARK: - Splitters
 
