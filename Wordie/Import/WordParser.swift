@@ -13,6 +13,7 @@ struct ParsedRow: Identifiable, Equatable {
 /// How columns are separated in the pasted / imported text.
 enum Delimiter: String, CaseIterable, Identifiable {
     case auto = "자동 감지"
+    case script = "영어 / 한글 경계"
     case tab = "탭"
     case comma = "쉼표 ,"
     case dash = "대시 -"
@@ -71,16 +72,26 @@ enum WordParser {
         switch delimiter {
         case .tab:    return splitOnce(cleaned, "\t")
         case .comma:  return csvRow(cleaned)
-        case .dash:   return splitSeparated(cleaned, " - ")
+        case .dash:   return splitOnDash(cleaned)
         case .colon:  return splitSeparated(cleaned, ":")
         case .equals: return splitSeparated(cleaned, "=")
+        case .script: return splitAtScriptBoundary(cleaned)
         case .auto:   return autoSplit(cleaned)
         }
     }
 
     /// Tries the most reliable separators in order.
     private static func autoSplit(_ line: String) -> ParsedRow? {
+        // A tab is an explicit column break — pasted straight out of a spreadsheet.
         if line.contains("\t") { return splitOnce(line, "\t") }
+
+        // For an English↔Korean deck, the point where the script changes is the most
+        // reliable boundary there is. It survives hyphens inside the term
+        // ("well-known", "hold on-") and commas inside the meaning ("기다려, 잠깐만"),
+        // both of which defeat splitting on punctuation.
+        if let row = splitAtScriptBoundary(line) { return row }
+
+        // Decks that aren't English↔Korean fall back to punctuation.
         if line.contains(",") { return csvRow(line) }
         if line.contains(" - ") { return splitSeparated(line, " - ") }
         if line.contains(" : ") { return splitSeparated(line, " : ") }
@@ -91,6 +102,42 @@ enum WordParser {
         return nil
     }
 
+    /// Splits at the first Korean character: everything before it is the term,
+    /// everything from it on is the meaning.
+    ///
+    /// Any separator the writer left between the two — a dash, colon, comma, bullet —
+    /// is trimmed off the end of the term. A hyphen *inside* the term survives because
+    /// only trailing punctuation is removed.
+    private static func splitAtScriptBoundary(_ line: String) -> ParsedRow? {
+        guard let firstHangul = line.firstIndex(where: { $0.isHangul }) else { return nil }
+        // A line that opens in Korean is meaning-first; let the other rules
+        // (and the swap toggle) handle it.
+        guard firstHangul != line.startIndex else { return nil }
+
+        // Korean glosses are often written with a placeholder tilde — "~을 복습하다".
+        // That tilde belongs to the meaning, so pull the boundary back over it.
+        var boundary = firstHangul
+        while boundary > line.startIndex {
+            let prior = line.index(before: boundary)
+            guard placeholders.contains(line[prior]) else { break }
+            boundary = prior
+        }
+        guard boundary != line.startIndex else { return nil }
+
+        let term = String(line[..<boundary])
+            .trimmingCharacters(in: separatorTrim)
+        let meaning = String(line[boundary...]).trimmed
+
+        guard !term.isEmpty, !meaning.isEmpty else { return nil }
+        return ParsedRow(term: term, meaning: meaning)
+    }
+
+    /// Trailing junk left between the two columns.
+    private static let separatorTrim = CharacterSet(charactersIn: " \t-–—―:=,;·••|/\\>")
+
+    /// Placeholder marks that open a Korean gloss rather than close the term.
+    private static let placeholders: Set<Character> = ["~", "∼", "〜", "～"]
+
     // MARK: - Splitters
 
     private static func splitOnce(_ line: String, _ sep: Character) -> ParsedRow? {
@@ -98,6 +145,25 @@ enum WordParser {
         let term = String(line[..<idx]).trimmed
         let rest = String(line[line.index(after: idx)...])
         return rowFromCells([term] + rest.components(separatedBy: String(sep)).map { $0.trimmed })
+    }
+
+    /// Dash separation, tolerant of how people actually type it.
+    ///
+    /// A spaced dash (`hold on - 기다려`) is unambiguous, so it wins. Without spaces
+    /// the dash could belong to the term itself (`well-known`), so we split on the
+    /// **last** one — a separator sits between the columns, and hyphenated words
+    /// keep their earlier hyphens.
+    private static func splitOnDash(_ line: String) -> ParsedRow? {
+        for spaced in [" - ", " – ", " — ", " -", "- "] {
+            if let row = splitSeparated(line, spaced) { return row }
+        }
+        guard let last = line.lastIndex(where: { $0 == "-" || $0 == "–" || $0 == "—" }) else {
+            return nil
+        }
+        let term = String(line[..<last]).trimmed
+        let meaning = String(line[line.index(after: last)...]).trimmed
+        guard !term.isEmpty, !meaning.isEmpty else { return nil }
+        return ParsedRow(term: term, meaning: meaning)
     }
 
     private static func splitSeparated(_ line: String, _ sep: String) -> ParsedRow? {
@@ -179,4 +245,22 @@ enum WordParser {
 
 extension String {
     var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
+}
+
+extension Character {
+    /// Any Korean letter — precomposed syllables plus both Jamo blocks.
+    var isHangul: Bool {
+        unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0xAC00...0xD7A3,   // 가–힣
+                 0x1100...0x11FF,   // Hangul Jamo
+                 0x3130...0x318F,   // compatibility Jamo (ㄱ, ㅏ …)
+                 0xA960...0xA97F,   // Jamo Extended-A
+                 0xD7B0...0xD7FF:   // Jamo Extended-B
+                return true
+            default:
+                return false
+            }
+        }
+    }
 }
