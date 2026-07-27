@@ -16,6 +16,9 @@ final class StudySession {
     private(set) var clearedIDs: Set<UUID> = []
     private let totalCount: Int
 
+    /// Misses per card this session — the input to spaced-repetition grading.
+    private var misses: [UUID: Int] = [:]
+
     /// Multiple-choice options for the current recall card (empty for spell).
     private(set) var options: [String] = []
 
@@ -96,9 +99,17 @@ final class StudySession {
             clearedIDs.insert(card.id)
             queue.removeFirst()
             lastResult = .correct
+
+            // The card is settled for today — book its next review.
+            // 암기 is exposure, not retrieval, so it doesn't earn a schedule.
+            if mode != .memorize {
+                let grade = ReviewGrade(missCount: misses[card.id] ?? 0)
+                Scheduler.apply(grade, to: card)
+            }
         } else {
             card.recordWrong()
             bumpStreak(card, up: false)
+            misses[card.id, default: 0] += 1
             // Move to the back so it comes around again this session.
             let missed = queue.removeFirst()
             queue.append(missed)

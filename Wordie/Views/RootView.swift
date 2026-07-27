@@ -8,6 +8,13 @@ struct RootView: View {
     @Query(sort: \VocabSet.updatedAt, order: .reverse) private var sets: [VocabSet]
 
     @State private var showingNewSet = false
+    @State private var showingReview = false
+
+    /// Every card across every set whose review date has arrived, hardest first.
+    private var dueCards: [Vocab] {
+        sets.flatMap { $0.dueWords() }
+            .sorted { $0.lapses > $1.lapses }
+    }
 
     var body: some View {
         NavigationStack {
@@ -36,6 +43,9 @@ struct RootView: View {
             .sheet(isPresented: $showingNewSet) {
                 NewSetView()
             }
+            .sheet(isPresented: $showingReview) {
+                ReviewStartView(dueCards: dueCards)
+            }
         }
         .tint(Theme.tint)
     }
@@ -43,6 +53,16 @@ struct RootView: View {
     private var setList: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
+                if !dueCards.isEmpty {
+                    Button {
+                        Haptics.soft()
+                        showingReview = true
+                    } label: {
+                        ReviewBanner(count: dueCards.count)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 ForEach(sets) { set in
                     NavigationLink(value: set) {
                         SetRow(set: set)
@@ -87,6 +107,36 @@ struct RootView: View {
     }
 }
 
+/// Sits above the set list whenever cards have come due.
+private struct ReviewBanner: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(Theme.tint.gradient)
+                    .frame(width: 46, height: 46)
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("오늘의 복습")
+                    .font(.headline)
+                Text("\(count)개 단어가 복습할 때가 됐어요")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(14)
+        .glassPanel(corner: 24, tint: Theme.tint)
+    }
+}
+
 private struct SetRow: View {
     let set: VocabSet
 
@@ -114,6 +164,18 @@ private struct SetRow: View {
                 Text("\(set.totalStars)")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
+
+                let due = set.dueCount()
+                if due > 0 {
+                    Text("복습 \(due)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.tint)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Theme.tint.opacity(0.14)))
+                        .padding(.leading, 4)
+                }
+
                 Spacer()
                 Text("\(Int(set.masteryProgress * 100))% 완료")
                     .font(.caption2)

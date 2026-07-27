@@ -44,6 +44,15 @@ extension VocabSet {
         words.reduce(0) { $0 + $1.starRating }
     }
 
+    /// Cards whose review date has arrived.
+    func dueWords(asOf now: Date = Date()) -> [Vocab] {
+        words.filter { $0.isDue(asOf: now) }
+    }
+
+    func dueCount(asOf now: Date = Date()) -> Int {
+        dueWords(asOf: now).count
+    }
+
     func touch() {
         updatedAt = Date()
     }

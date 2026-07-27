@@ -30,6 +30,23 @@ final class Vocab {
     var timesWrong: Int = 0
     var lastStudied: Date?
 
+    // MARK: Spaced repetition
+    //
+    // Session repetition ("keep going until you clear it") only fixes a word for today.
+    // These fields carry it across days: each successful retrieval pushes the next
+    // review further out, each lapse pulls it back in.
+
+    /// When this card should next be reviewed. `nil` means it has never been graded.
+    var dueDate: Date?
+    /// Current spacing in days. 0 means not yet scheduled.
+    var interval: Double = 0
+    /// How fast the interval grows. Starts at 2.5 and drifts with performance.
+    var ease: Double = 2.5
+    /// Times the card was forgotten after having been learned.
+    var lapses: Int = 0
+    /// Completed graded reviews.
+    var reviewCount: Int = 0
+
     var createdAt: Date = Date()
 
     var set: VocabSet?
@@ -64,4 +81,18 @@ extension Vocab {
         timesWrong += 1
         lastStudied = Date()
     }
+
+    // MARK: Review state
+
+    /// Due for review now. Cards never graded are not due — they belong in a first pass.
+    func isDue(asOf now: Date = Date()) -> Bool {
+        guard let dueDate else { return false }
+        return dueDate <= now
+    }
+
+    /// Graded at least once, so it has a place in the review schedule.
+    var isScheduled: Bool { dueDate != nil }
+
+    /// Repeatedly forgotten — worth surfacing separately.
+    var isLeech: Bool { lapses >= 4 }
 }
