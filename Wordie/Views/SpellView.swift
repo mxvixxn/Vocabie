@@ -1,7 +1,12 @@
 import SwiftUI
 
-/// 스펠 (Spell): type the word from its meaning. Grading is lenient (case/space/punctuation
-/// insensitive). A hint reveals the answer but counts the card as missed, so it returns later.
+/// 스펠 (Spell): type the word from its meaning.
+///
+/// Grading is lenient — case, spacing, punctuation and slashes are ignored. A hint reveals
+/// the answer but counts as a miss, so the card returns later.
+///
+/// Vertical space is the real constraint here: the keyboard takes roughly 40% of the screen,
+/// so once the field is focused the pill shrinks and the prompt chrome steps out of the way.
 struct SpellView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
@@ -13,133 +18,111 @@ struct SpellView: View {
     @State private var phase: Phase = .typing
     @State private var usedHint = false
 
-    private enum Phase { case typing, correct, wrong }
+    private enum Phase { case typing, correct, missed }
+
+    /// True while the keyboard is claiming the bottom of the screen.
+    private var tight: Bool { fieldFocused && phase == .typing }
 
     var body: some View {
         ZStack {
             Theme.background(scheme).ignoresSafeArea()
 
             if session.isFinished {
-                StudyCompleteView(
-                    mode: .spell,
-                    total: session.total,
-                    onRestart: restart,
-                    onClose: close
-                )
+                StudyCompleteView(mode: .spell, total: session.total,
+                                  onRestart: restart, onClose: close)
             } else {
-                VStack(spacing: 0) {
-                    StudyTopBar(
-                        title: "스펠 \(session.clearedCount)/\(session.total)",
-                        progress: session.progress,
+                StudyScaffold(
+                    mode: .spell,
+                    cleared: session.clearedCount,
+                    total: session.total,
+                    progress: session.progress,
+                    compactPill: tight,
+                    onClose: close
+                ) {
+                    WordStage(
+                        kicker: session.direction == .meaningToTerm
+                            ? "뜻을 보고 단어를 입력하세요" : "단어를 보고 뜻을 입력하세요",
+                        word: session.prompt,
+                        note: session.promptNote,
                         accent: Theme.spell,
-                        onClose: close
+                        // The prompt keeps only the word once the keyboard is up.
+                        showsChrome: !tight,
+                        size: tight ? 30 : 34
                     )
-                    Spacer()
-                    promptCard
-                    inputArea
-                    Spacer()
-                    actionButton
+                } panel: {
+                    FloatingPanel(tint: Theme.spell) {
+                        answerField
+                        if phase == .missed { answerReveal }
+                        controls
+                    }
                 }
             }
         }
         .onAppear { fieldFocused = true }
     }
 
-    private var promptCard: some View {
-        VStack(spacing: 10) {
-            Text(session.direction == .meaningToTerm ? "뜻을 보고 단어를 입력하세요" : "단어를 보고 뜻을 입력하세요")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.spell)
-            Text(session.prompt)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .multilineTextAlignment(.center)
-                .minimumScaleFactor(0.5)
-            if !session.promptNote.isEmpty && phase == .typing {
-                Text(session.promptNote)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 170)
-        .cardSurface(padding: 24)
-        .padding(.horizontal, 24)
+    // MARK: Panel contents
+
+    private var answerField: some View {
+        TextField("정답 입력", text: $typed)
+            .focused($fieldFocused)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.done)
+            .font(.title3.weight(.medium))
+            .multilineTextAlignment(.center)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.innerCorner, style: .continuous)
+                    .fill(fieldFill)
+            )
+            .disabled(phase != .typing)
+            .onSubmit { if phase == .typing { check() } }
+            .animation(.easeInOut(duration: 0.2), value: phase)
     }
 
-    @ViewBuilder
-    private var inputArea: some View {
-        VStack(spacing: 12) {
-            TextField("정답 입력", text: $typed)
-                .focused($fieldFocused)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .font(.title3.weight(.medium))
-                .multilineTextAlignment(.center)
-                .padding(.vertical, 14)
-                .background(fieldBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .disabled(phase != .typing)
-                .onSubmit { if phase == .typing { check() } }
-
-            if phase == .wrong {
-                VStack(spacing: 4) {
-                    Text("정답")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text(session.expectedAnswer)
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(Theme.spell)
-                }
-                .transition(.opacity)
-            }
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 18)
-        .animation(.easeInOut(duration: 0.2), value: phase)
-    }
-
-    private var fieldBackground: some ShapeStyle {
+    private var fieldFill: Color {
         switch phase {
-        case .typing:  return AnyShapeStyle(.ultraThinMaterial)
-        case .correct: return AnyShapeStyle(Theme.correct.opacity(0.25))
-        case .wrong:   return AnyShapeStyle(Color.orange.opacity(0.2))
+        case .typing:  Color.primary.opacity(0.06)
+        case .correct: Theme.correct.opacity(0.25)
+        case .missed:  Color.orange.opacity(0.16)
         }
     }
 
+    private var answerReveal: some View {
+        VStack(spacing: 2) {
+            Text("정답")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(session.expectedAnswer)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(Theme.spell)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .transition(.opacity)
+    }
+
     @ViewBuilder
-    private var actionButton: some View {
+    private var controls: some View {
         switch phase {
         case .typing:
-            HStack(spacing: 12) {
-                Button(action: hint) {
-                    Text("힌트")
-                        .font(.headline)
-                        .frame(width: 90)
-                        .padding(.vertical, 16)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                Button(action: check) {
-                    Text("확인")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Theme.spell, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .foregroundStyle(.white)
-                }
-                .disabled(typed.trimmed.isEmpty)
-                .opacity(typed.trimmed.isEmpty ? 0.5 : 1)
+            HStack(spacing: 8) {
+                PanelButton(title: "힌트", action: hint)
+                    .frame(width: 92)
+                PanelButton(title: "확인", fill: Theme.spell, solid: true, action: check)
+                    .disabled(typed.trimmed.isEmpty)
+                    .opacity(typed.trimmed.isEmpty ? 0.5 : 1)
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
-        case .correct, .wrong:
-            Button(action: proceed) {
-                Text("다음")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background((phase == .correct ? Theme.correct : Theme.spell),
-                               in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .foregroundStyle(.white)
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
+        case .correct, .missed:
+            PanelButton(
+                title: "다음",
+                fill: phase == .correct ? Theme.correct : Theme.spell,
+                solid: true,
+                action: proceed
+            )
         }
     }
 
@@ -148,8 +131,9 @@ struct SpellView: View {
     private func check() {
         guard phase == .typing else { return }
         let ok = SpellNormalizer.matches(answer: typed, expected: session.expectedAnswer)
-        phase = ok ? .correct : .wrong
-        ok ? Haptics.success() : Haptics.rigid()
+        withAnimation(.easeInOut(duration: 0.2)) { phase = ok ? .correct : .missed }
+        ok ? Haptics.success() : Haptics.nudge()
+
         if ok {
             Task {
                 try? await Task.sleep(nanoseconds: 550_000_000)
@@ -160,18 +144,19 @@ struct SpellView: View {
 
     private func hint() {
         usedHint = true
-        phase = .wrong
-        Haptics.rigid()
+        withAnimation(.easeInOut(duration: 0.2)) { phase = .missed }
+        Haptics.nudge()
     }
 
     private func proceed() {
         if phase == .correct && !usedHint {
             session.submitSpelling(typed)
         } else {
-            // Wrong answer or hint used — counts as missed, card returns later.
+            // A miss or a hint — the card comes back around later.
             session.revealAsHint()
         }
         try? context.save()
+
         typed = ""
         usedHint = false
         phase = .typing

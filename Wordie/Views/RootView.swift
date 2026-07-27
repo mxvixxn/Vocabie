@@ -120,6 +120,7 @@ private struct SetRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .cardSurface()
+        .padding(16)
+        .glassPanel(corner: 24)
     }
 }

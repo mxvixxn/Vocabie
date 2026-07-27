@@ -1,14 +1,16 @@
 import SwiftUI
 
 /// 리콜 (Recall): pick the correct answer from four choices.
-/// Wrong picks aren't punished harshly — the card simply comes back later.
+///
+/// Missing is not punished — there is no ✗ and no red. The right answer simply lights up,
+/// the card slides to the back of the queue, and it comes around again later.
 struct RecallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
     @Environment(\.modelContext) private var context
 
     @State var session: StudySession
-    /// The option the user tapped, held briefly to show feedback.
+    /// The option the learner tapped, held while feedback shows.
     @State private var selected: String?
     private var locked: Bool { selected != nil }
 
@@ -17,82 +19,63 @@ struct RecallView: View {
             Theme.background(scheme).ignoresSafeArea()
 
             if session.isFinished {
-                StudyCompleteView(
-                    mode: .recall,
-                    total: session.total,
-                    onRestart: restart,
-                    onClose: close
-                )
+                StudyCompleteView(mode: .recall, total: session.total,
+                                  onRestart: restart, onClose: close)
             } else {
-                VStack(spacing: 0) {
-                    StudyTopBar(
-                        title: "리콜 \(session.clearedCount)/\(session.total)",
-                        progress: session.progress,
+                StudyScaffold(
+                    mode: .recall,
+                    cleared: session.clearedCount,
+                    total: session.total,
+                    progress: session.progress,
+                    onClose: close
+                ) {
+                    WordStage(
+                        kicker: session.direction == .termToMeaning
+                            ? "알맞은 뜻을 고르세요" : "알맞은 단어를 고르세요",
+                        word: session.prompt,
                         accent: Theme.recall,
-                        onClose: close
+                        size: 36
                     )
-                    Spacer()
-                    promptCard
-                    Spacer()
-                    options
+                } panel: {
+                    FloatingPanel(tint: Theme.recall) {
+                        ForEach(session.options, id: \.self) { option in
+                            optionRow(option)
+                        }
+                    }
                 }
             }
         }
     }
 
-    private var promptCard: some View {
-        VStack(spacing: 10) {
-            Text(session.direction == .termToMeaning ? "알맞은 뜻을 고르세요" : "알맞은 단어를 고르세요")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.recall)
-            Text(session.prompt)
-                .font(.system(size: 32, weight: .bold, design: .rounded))
-                .multilineTextAlignment(.center)
-                .minimumScaleFactor(0.5)
-        }
-        .frame(maxWidth: .infinity, minHeight: 180)
-        .cardSurface(padding: 26)
-        .padding(.horizontal, 24)
-    }
-
-    private var options: some View {
-        VStack(spacing: 12) {
-            ForEach(session.options, id: \.self) { option in
-                Button {
-                    choose(option)
-                } label: {
-                    Text(option)
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 16)
-                        .padding(.horizontal, 18)
-                        .background(background(for: option), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .foregroundStyle(foreground(for: option))
-                }
-                .disabled(locked)
+    private func optionRow(_ option: String) -> some View {
+        Button {
+            choose(option)
+        } label: {
+            PanelRow(fill: fill(for: option), foreground: foreground(for: option)) {
+                Text(option)
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.leading)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 30)
-        .animation(.easeInOut(duration: 0.2), value: selected)
+        .buttonStyle(.plain)
+        .disabled(locked)
+        .animation(.easeInOut(duration: 0.22), value: selected)
     }
 
-    // MARK: Feedback colours
+    // MARK: Feedback
 
-    private func background(for option: String) -> some ShapeStyle {
-        guard let selected else { return AnyShapeStyle(.ultraThinMaterial) }
-        if option == session.expectedAnswer {
-            return AnyShapeStyle(Theme.correct.opacity(0.85))
-        }
-        if option == selected {
-            return AnyShapeStyle(Color.orange.opacity(0.7))
-        }
-        return AnyShapeStyle(Color.secondary.opacity(0.12))
+    private func fill(for option: String) -> Color? {
+        guard selected != nil else { return nil }
+        if option == session.expectedAnswer { return Theme.correct.opacity(0.9) }
+        // The miss just fades back rather than turning red.
+        return Color.primary.opacity(0.03)
     }
 
-    private func foreground(for option: String) -> Color {
-        guard let selected else { return .primary }
-        if option == session.expectedAnswer || option == selected { return .white }
+    private func foreground(for option: String) -> Color? {
+        guard selected != nil else { return nil }
+        if option == session.expectedAnswer { return .white }
         return .secondary
     }
 
@@ -102,10 +85,10 @@ struct RecallView: View {
         guard !locked else { return }
         let isCorrect = option == session.expectedAnswer
         selected = option
-        isCorrect ? Haptics.success() : Haptics.rigid()
-        // Brief pause so the learner sees the correct answer highlighted before
-        // the session mutates the queue and moves on.
-        let delay: UInt64 = isCorrect ? 450_000_000 : 900_000_000
+        isCorrect ? Haptics.success() : Haptics.nudge()
+
+        // Hold the highlight so the answer registers, then let the session move on.
+        let delay: UInt64 = isCorrect ? 450_000_000 : 950_000_000
         Task {
             try? await Task.sleep(nanoseconds: delay)
             session.submitChoice(option)

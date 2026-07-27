@@ -68,7 +68,8 @@ struct SetDetailView: View {
             ProgressView(value: set.masteryProgress)
                 .tint(Theme.tint)
         }
-        .cardSurface()
+        .padding(16)
+        .glassPanel(corner: 24)
         .padding(.top, 8)
     }
 
@@ -137,7 +138,8 @@ struct SetDetailView: View {
                     .foregroundStyle(.white)
             }
         }
-        .cardSurface()
+        .padding(20)
+        .glassPanel(corner: 24)
         .padding(.top, 30)
     }
 
@@ -180,7 +182,8 @@ private struct ModeCard: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
         }
-        .cardSurface(padding: 14)
+        .padding(14)
+        .glassPanel(corner: 24, tint: mode.color)
     }
 }
 
@@ -204,6 +207,9 @@ private struct WordRow: View {
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 14)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.ultraThinMaterial))
+        // Content, not a control — a quiet fill instead of glass, so a long list
+        // doesn't turn into a stack of competing panes.
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Color.primary.opacity(0.05)))
     }
 }

@@ -79,7 +79,7 @@ struct EditWordView: View {
             context.delete(word)
             set.touch()
             try? context.save()
-            Haptics.rigid()
+            Haptics.nudge()
         }
         dismiss()
     }
