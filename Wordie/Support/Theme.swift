@@ -96,4 +96,27 @@ enum Haptics {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         #endif
     }
+
+    /// Light tick when a swipe action arms something. Matches Moodie Sky's
+    /// `triggerSelectionHaptic()`.
+    static func selection() {
+        #if canImport(UIKit)
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+        #endif
+    }
+
+    /// Destructive confirmation — two error taps 0.1s apart, so deleting *feels*
+    /// irreversible. Mirrors Moodie Sky's `triggerIntenseErrorHaptic()`.
+    static func intenseError() {
+        #if canImport(UIKit)
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(.error)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            generator.notificationOccurred(.error)
+        }
+        #endif
+    }
 }

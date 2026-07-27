@@ -294,9 +294,43 @@ SwiftUI가 스스로 닫을 수 없는 바인딩이라 알림이 화면에 남�
 
 로드맵 2-1 항목. 지금까지 **만든 단어장을 지울 방법이 없었다.**
 
-- **홈** — 단어장 길게 눌러 컨텍스트 메뉴 → 삭제
+- **홈** — **옆으로 스와이프** (Moodie Sky 다이어리 목록과 동일 패턴)
+  - 왼쪽으로 밀기(trailing) → 삭제. `allowsFullSwipe: true` 라 끝까지 밀면 바로 확인 창
+  - 오른쪽으로 밀기(leading) → 이름 변경. `.tint(.blue)`
 - **단어장 상세** — 우측 상단 `⋯` 메뉴 → 이름 변경 / 삭제
 - 삭제는 **확인 다이얼로그**를 거친다. 단어 수를 함께 보여주고 되돌릴 수 없음을 명시
 - `Vocab` 에 cascade 규칙이 걸려 있어 단어와 학습 기록이 함께 삭제된다
 
 툴바 아이콘을 `plus.circle.fill` → `ellipsis.circle.fill` 로 바꿨다. 이제 추가 말고도 다른 동작이 들어가서.
+
+## 스와이프 삭제 — Moodie Sky 패턴 이식
+
+`.swipeActions` 는 `List` 안에서만 동작한다. 홈 화면이 `ScrollView` + `LazyVStack` 이었으므로 `List` 로 바꾸고, 카드가 그라데이션 위에 떠 있던 모양은 그대로 유지했다.
+
+```swift
+.listStyle(.plain)
+.scrollContentBackground(.hidden)   // 배경 그라데이션이 비치도록
+```
+
+행 여백은 Moodie Sky 다이어리 목록과 동일하게 맞췄다 (`plainRow()`):
+
+```swift
+.listRowBackground(Color.clear)
+.listRowSeparator(.hidden)
+.listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+```
+
+### 햅틱도 동일하게
+
+| 시점 | 햅틱 | Moodie Sky 대응 |
+|---|---|---|
+| 스와이프해서 삭제/이름변경 누름 | `Haptics.selection()` — `UISelectionFeedbackGenerator` | `triggerSelectionHaptic()` |
+| 삭제 확정 | `Haptics.intenseError()` — `.error` **두 번, 0.1초 간격** | `triggerIntenseErrorHaptic()` |
+
+둘 다 `prepare()` 를 먼저 호출한다. 삭제 확정의 이중 진동이 "되돌릴 수 없다"는 감각을 만드는 부분이라 그대로 옮겼다.
+
+행 등장·삭제에는 `.transition(.move(edge: .top).combined(with: .opacity))` 와 `withAnimation` 을 걸어 목록이 부드럽게 접히게 했다.
+
+### 남은 것
+
+`List` 안의 `NavigationLink` 라 행 오른쪽에 시스템 **디스클로저 셰브런(›)** 이 붙는다. 카드형 행과 어울리는지는 실제 빌드에서 확인 필요. 거슬리면 `NavigationLink` 대신 탭 제스처 + `navigationDestination(isPresented:)` 로 바꾸면 된다 (Moodie Sky가 쓰는 방식).

@@ -11,6 +11,9 @@ struct RootView: View {
     @State private var showingReview = false
     /// Set awaiting delete confirmation. Deleting takes its words with it, so we ask.
     @State private var pendingDeletion: VocabSet?
+    /// Set being renamed from the leading swipe.
+    @State private var renameTarget: VocabSet?
+    @State private var draftTitle = ""
 
     /// Every card across every set whose review date has arrived, hardest first.
     private var dueCards: [Vocab] {
@@ -63,6 +66,14 @@ struct RootView: View {
                     Text("단어 \(set.wordCount)개와 학습 기록이 함께 사라져요. 되돌릴 수 없어요.")
                 }
             }
+            .alert("이름 변경", isPresented: Binding(
+                get: { renameTarget != nil },
+                set: { if !$0 { renameTarget = nil } }
+            )) {
+                TextField("단어장 이름", text: $draftTitle)
+                Button("취소", role: .cancel) { renameTarget = nil }
+                Button("저장") { if let set = renameTarget { rename(set) } }
+            }
         }
         .tint(Theme.tint)
     }
@@ -72,42 +83,62 @@ struct RootView: View {
         // Clear the reference first so the dialog stops reading a deleted object.
         pendingDeletion = nil
         // Vocab has a cascade delete rule, so its words go with it.
-        context.delete(set)
+        withAnimation { context.delete(set) }
         try? context.save()
-        Haptics.nudge()
+        Haptics.intenseError()
+    }
+
+    private func rename(_ set: VocabSet) {
+        let title = draftTitle.trimmed
+        renameTarget = nil
+        guard !title.isEmpty else { return }
+        set.title = title
+        set.touch()
+        try? context.save()
+        Haptics.success()
     }
 
     private var setList: some View {
-        ScrollView {
-            LazyVStack(spacing: 14) {
-                if !dueCards.isEmpty {
-                    Button {
-                        Haptics.soft()
-                        showingReview = true
-                    } label: {
-                        ReviewBanner(count: dueCards.count)
-                    }
-                    .buttonStyle(.plain)
+        List {
+            if !dueCards.isEmpty {
+                Button {
+                    Haptics.soft()
+                    showingReview = true
+                } label: {
+                    ReviewBanner(count: dueCards.count)
                 }
-
-                ForEach(sets) { set in
-                    NavigationLink(value: set) {
-                        SetRow(set: set)
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            pendingDeletion = set
-                        } label: {
-                            Label("단어장 삭제", systemImage: "trash")
-                        }
-                    }
-                }
+                .buttonStyle(.plain)
+                .plainRow()
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 32)
+
+            ForEach(sets) { set in
+                NavigationLink(value: set) {
+                    SetRow(set: set)
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .swipeActions(edge: .leading) {
+                    Button {
+                        Haptics.selection()
+                        draftTitle = set.title
+                        renameTarget = set
+                    } label: {
+                        Label("이름 변경", systemImage: "pencil")
+                    }
+                    .tint(.blue)
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        Haptics.selection()
+                        pendingDeletion = set
+                    } label: {
+                        Label("삭제", systemImage: "trash")
+                    }
+                }
+                .plainRow()
+            }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .navigationDestination(for: VocabSet.self) { set in
             SetDetailView(set: set)
         }
@@ -138,6 +169,16 @@ struct RootView: View {
             .padding(.top, 4)
         }
         .padding(40)
+    }
+}
+
+/// Strips the List chrome so rows keep floating on the gradient the way they did
+/// in the scroll view. Same row metrics as Moodie Sky's diary list.
+private extension View {
+    func plainRow() -> some View {
+        listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
     }
 }
 

@@ -193,7 +193,7 @@ struct SetDetailView: View {
         // Leave the screen *before* deleting. This view binds to `set`, so deleting
         // while it is still on screen means one more render against a torn-down
         // object — navigation title, word list and all.
-        Haptics.nudge()
+        Haptics.intenseError()
         dismiss()
 
         let doomed = set
