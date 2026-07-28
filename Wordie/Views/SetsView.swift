@@ -5,7 +5,8 @@ import SwiftData
 struct SetsView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
-    @Query(sort: \VocabSet.updatedAt, order: .reverse) private var sets: [VocabSet]
+    @Query(filter: #Predicate<VocabSet> { !$0.isArchived },
+           sort: \VocabSet.updatedAt, order: .reverse) private var sets: [VocabSet]
 
     @State private var showingNewSet = false
     /// Set awaiting delete confirmation. Deleting takes its words with it, so we ask.
@@ -88,6 +89,15 @@ struct SetsView: View {
         Haptics.intenseError()
     }
 
+    private func archive(_ set: VocabSet) {
+        Haptics.selection()
+        withAnimation {
+            set.isArchived = true
+            set.touch()
+        }
+        try? context.save()
+    }
+
     private func rename(_ set: VocabSet) {
         let title = draftTitle.trimmed
         renameTarget = nil
@@ -116,13 +126,19 @@ struct SetsView: View {
                     }
                     .tint(.blue)
                 }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
                         Haptics.selection()
                         pendingDeletion = set
                     } label: {
                         Label("삭제", systemImage: "trash")
                     }
+                    Button {
+                        archive(set)
+                    } label: {
+                        Label("보관", systemImage: "archivebox")
+                    }
+                    .tint(Theme.tint)
                 }
             }
         }

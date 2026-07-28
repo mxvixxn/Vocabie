@@ -8,9 +8,11 @@ struct HomeView: View {
 
     @State private var showingReview = false
 
-    /// Every card across every set whose review date has arrived, hardest first.
+    /// Every card across every active set whose review date has arrived, hardest first.
+    /// Archived sets are set aside, so they don't pull cards into today's review.
     private var dueCards: [Vocab] {
-        sets.flatMap { $0.dueWords() }
+        sets.filter { !$0.isArchived }
+            .flatMap { $0.dueWords() }
             .sorted { $0.lapses > $1.lapses }
     }
 

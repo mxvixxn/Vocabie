@@ -10,6 +10,9 @@ final class VocabSet {
     var detail: String = ""
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    /// Archived sets are hidden from the main list and from today's review,
+    /// but kept so they can be restored later.
+    var isArchived: Bool = false
 
     /// Cards belonging to this set. Deleting the set deletes its cards.
     @Relationship(deleteRule: .cascade, inverse: \Vocab.set)

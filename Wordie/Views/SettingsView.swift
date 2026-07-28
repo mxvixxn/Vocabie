@@ -10,11 +10,24 @@ struct SettingsView: View {
                 Theme.background(scheme).ignoresSafeArea()
                 List {
                     Section {
-                        placeholderRow("bell", "알림")
+                        NavigationLink {
+                            NotificationSettingsView()
+                        } label: {
+                            Label("알림", systemImage: "bell")
+                        }
+                        NavigationLink {
+                            ArchiveView()
+                        } label: {
+                            Label("보관함", systemImage: "archivebox")
+                        }
+                    }
+                    .listRowBackground(Color.primary.opacity(0.04))
+
+                    Section {
                         placeholderRow("paintbrush", "테마")
                         placeholderRow("square.and.arrow.up", "단어장 내보내기")
                     }
-                    .listRowBackground(Color.clear)
+                    .listRowBackground(Color.primary.opacity(0.04))
                 }
                 .scrollContentBackground(.hidden)
             }
