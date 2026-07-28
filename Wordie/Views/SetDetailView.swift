@@ -10,6 +10,8 @@ struct SetDetailView: View {
     @Bindable var set: VocabSet
 
     @AppStorage("autoSpeak") private var autoSpeak = true
+    /// When on, 리콜 / 스펠 draw cards in random order instead of set order.
+    @AppStorage("studyShuffle") private var shuffleStudy = false
 
     @State private var direction: StudyDirection = .termToMeaning
     @State private var showingImport = false
@@ -18,6 +20,14 @@ struct SetDetailView: View {
     @State private var showingRename = false
     @State private var confirmingDelete = false
     @State private var draftTitle = ""
+
+    // Round (묶음) study — the set is studied 10 cards at a time.
+    private let roundSize = 10
+    @State private var selectedRound = 0
+    // Resume flow for 리콜 / 스펠.
+    @State private var showingResumeDialog = false
+    @State private var pendingMode: StudyMode?
+    @State private var resumeProgress: StudyProgress?
 
     var body: some View {
         ZStack {
@@ -29,6 +39,7 @@ struct SetDetailView: View {
                         emptyWords
                     } else {
                         directionPicker
+                        studyOptions
                         modeCards
                         wordListSection
                     }
@@ -91,6 +102,24 @@ struct SetDetailView: View {
         .fullScreenCover(item: $activeMode) { mode in
             studyView(for: mode)
         }
+        .confirmationDialog(
+            "이어서 학습할까요?",
+            isPresented: $showingResumeDialog,
+            titleVisibility: .visible
+        ) {
+            Button("이어서 (\(resumeProgress?.clearedIDs.count ?? 0)/\(resumeProgress?.total ?? 0))") {
+                activeMode = pendingMode
+            }
+            Button("처음부터", role: .destructive) {
+                if let mode = pendingMode { StudyProgressStore.clear(progressKey(mode)) }
+                resumeProgress = nil
+                activeMode = pendingMode
+            }
+            Button("취소", role: .cancel) { pendingMode = nil; resumeProgress = nil }
+        } message: {
+            Text("이 묶음에 저장된 진행이 있어요.")
+        }
+        .onAppear(perform: syncSelectedRound)
     }
 
     // MARK: Sections
@@ -122,12 +151,121 @@ struct SetDetailView: View {
             ForEach(StudyMode.allCases) { mode in
                 Button {
                     Haptics.soft()
-                    activeMode = mode
+                    launch(mode)
                 } label: {
                     ModeCard(mode: mode)
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    // MARK: Round (묶음) + shuffle
+
+    /// Cards split into rounds of `roundSize`. Sets of 10 or fewer are one round.
+    private var rounds: [[Vocab]] {
+        let words = set.orderedWords
+        guard words.count > roundSize else { return [words] }
+        return stride(from: 0, to: words.count, by: roundSize).map {
+            Array(words[$0 ..< min($0 + roundSize, words.count)])
+        }
+    }
+
+    private var hasRounds: Bool { self.set.wordCount > roundSize }
+    private var currentRound: Int { rounds.indices.contains(selectedRound) ? selectedRound : 0 }
+    private var roundCards: [Vocab] { rounds.isEmpty ? [] : rounds[currentRound] }
+
+    private func roundRangeLabel(_ i: Int) -> String {
+        guard rounds.indices.contains(i) else { return "" }
+        return "\(i * roundSize + 1)–\(i * roundSize + rounds[i].count)"
+    }
+
+    /// A round is "done" once every card in it is fully mastered (3 stars).
+    private func roundMastered(_ i: Int) -> Bool {
+        guard rounds.indices.contains(i) else { return false }
+        return rounds[i].allSatisfy { $0.starRating >= 3 }
+    }
+
+    private var firstUnfinishedRound: Int {
+        rounds.firstIndex { round in !round.allSatisfy { $0.starRating >= 3 } } ?? 0
+    }
+
+    /// Land on the first unfinished round, unless the learner is mid-way through one.
+    private func syncSelectedRound() {
+        if !rounds.indices.contains(selectedRound) || roundMastered(selectedRound) {
+            selectedRound = firstUnfinishedRound
+        }
+    }
+
+    private func progressKey(_ mode: StudyMode) -> String {
+        "\(mode.rawValue)|\(set.id.uuidString)|\(currentRound)"
+    }
+
+    private var studyOptions: some View {
+        HStack(spacing: 10) {
+            if hasRounds { roundMenu }
+            Spacer(minLength: 0)
+            shuffleButton
+        }
+    }
+
+    private var roundMenu: some View {
+        Menu {
+            ForEach(rounds.indices, id: \.self) { i in
+                Button {
+                    selectedRound = i
+                } label: {
+                    if roundMastered(i) {
+                        Label("묶음 \(i + 1) (\(roundRangeLabel(i)))", systemImage: "checkmark.circle.fill")
+                    } else {
+                        Text("묶음 \(i + 1) (\(roundRangeLabel(i)))")
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "square.stack.3d.up.fill").font(.caption)
+                Text("묶음 \(currentRound + 1) · \(roundRangeLabel(currentRound))")
+                Image(systemName: "chevron.down").font(.caption2)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Theme.tint)
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .background(Theme.tint.opacity(0.12), in: Capsule())
+        }
+    }
+
+    private var shuffleButton: some View {
+        Button {
+            shuffleStudy.toggle()
+            Haptics.selection()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "shuffle")
+                Text("랜덤")
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(shuffleStudy ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .background(
+                shuffleStudy ? AnyShapeStyle(Theme.tint) : AnyShapeStyle(Color.primary.opacity(0.06)),
+                in: Capsule()
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Launch a mode. 리콜 / 스펠 first offer to resume any saved progress.
+    private func launch(_ mode: StudyMode) {
+        resumeProgress = nil
+        if mode != .memorize,
+           let saved = StudyProgressStore.load(progressKey(mode)),
+           saved.total > 0, saved.clearedIDs.count < saved.total {
+            pendingMode = mode
+            resumeProgress = saved
+            showingResumeDialog = true
+        } else {
+            activeMode = mode
         }
     }
 
@@ -206,13 +344,22 @@ struct SetDetailView: View {
 
     @ViewBuilder
     private func studyView(for mode: StudyMode) -> some View {
+        let cards = roundCards
         switch mode {
         case .memorize:
-            MemorizeView(cards: set.orderedWords, direction: direction)
+            MemorizeView(cards: cards, direction: direction)
         case .recall:
-            RecallView(session: StudySession(cards: set.orderedWords, mode: .recall, direction: direction))
+            RecallView(
+                session: StudySession(cards: cards, mode: .recall, direction: direction,
+                                      shuffle: shuffleStudy, resume: resumeProgress),
+                progressKey: progressKey(.recall)
+            )
         case .spell:
-            SpellView(session: StudySession(cards: set.orderedWords, mode: .spell, direction: direction))
+            SpellView(
+                session: StudySession(cards: cards, mode: .spell, direction: direction,
+                                      shuffle: shuffleStudy, resume: resumeProgress),
+                progressKey: progressKey(.spell)
+            )
         }
     }
 }

@@ -14,6 +14,8 @@ struct SpellView: View {
     @FocusState private var fieldFocused: Bool
 
     @State var session: StudySession
+    /// Key under which this round's progress is saved, so leaving mid-way resumes.
+    let progressKey: String
     @State private var typed = ""
     @State private var phase: Phase = .typing
     @State private var usedHint = false
@@ -170,10 +172,22 @@ struct SpellView: View {
         phase = .typing
         session.advance()
         fieldFocused = true
+        persistProgress()
+    }
+
+    /// Save the round after every answer; clear it once the round is finished.
+    private func persistProgress() {
+        if session.isFinished {
+            StudyProgressStore.clear(progressKey)
+        } else {
+            StudyProgressStore.save(session.savedState, key: progressKey)
+        }
     }
 
     private func restart() {
-        session = StudySession(cards: session.snapshotCards, mode: .spell, direction: session.direction)
+        StudyProgressStore.clear(progressKey)
+        session = StudySession(cards: session.snapshotCards, mode: .spell,
+                               direction: session.direction, shuffle: session.shuffle)
         typed = ""
         phase = .typing
         usedHint = false

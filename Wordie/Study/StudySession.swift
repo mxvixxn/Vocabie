@@ -9,6 +9,8 @@ import Observation
 final class StudySession {
     let mode: StudyMode
     let direction: StudyDirection
+    /// Whether this run draws cards in random order (vs. the set's order).
+    let shuffle: Bool
 
     /// Cards still to be cleared, in the order they'll be shown.
     private var queue: [Vocab]
@@ -35,13 +37,34 @@ final class StudySession {
         case wrong(correctAnswer: String)
     }
 
-    init(cards: [Vocab], mode: StudyMode, direction: StudyDirection) {
+    init(cards: [Vocab], mode: StudyMode, direction: StudyDirection,
+         shuffle: Bool = false, resume: StudyProgress? = nil) {
         self.mode = mode
         self.direction = direction
+        self.shuffle = shuffle
         self.allCards = cards
-        self.queue = cards.shuffled()
-        self.totalCount = cards.count
+
+        if let resume {
+            let byID = Dictionary(cards.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            self.queue = resume.queueIDs.compactMap { byID[$0] }
+            self.clearedIDs = Set(resume.clearedIDs)
+            self.misses = resume.misses
+            self.totalCount = resume.total
+        } else {
+            self.queue = shuffle ? cards.shuffled() : cards
+            self.totalCount = cards.count
+        }
         prepareCurrent()
+    }
+
+    /// A snapshot for persistence, so an interrupted session can resume later.
+    var savedState: StudyProgress {
+        StudyProgress(
+            queueIDs: queue.map(\.id),
+            clearedIDs: Array(clearedIDs),
+            misses: misses,
+            total: totalCount
+        )
     }
 
     // MARK: Derived

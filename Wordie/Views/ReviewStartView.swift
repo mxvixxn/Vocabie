@@ -47,9 +47,17 @@ struct ReviewStartView: View {
             .fullScreenCover(item: $activeMode) { mode in
                 switch mode {
                 case .recall:
-                    RecallView(session: StudySession(cards: dueCards, mode: .recall, direction: direction))
+                    RecallView(
+                        session: StudySession(cards: dueCards, mode: .recall,
+                                              direction: direction, shuffle: true),
+                        progressKey: "review|recall"
+                    )
                 case .spell:
-                    SpellView(session: StudySession(cards: dueCards, mode: .spell, direction: direction))
+                    SpellView(
+                        session: StudySession(cards: dueCards, mode: .spell,
+                                              direction: direction, shuffle: true),
+                        progressKey: "review|spell"
+                    )
                 case .memorize:
                     MemorizeView(cards: dueCards, direction: direction)
                 }

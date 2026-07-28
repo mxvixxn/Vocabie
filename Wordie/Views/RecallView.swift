@@ -10,6 +10,8 @@ struct RecallView: View {
     @Environment(\.modelContext) private var context
 
     @State var session: StudySession
+    /// Key under which this round's progress is saved, so leaving mid-way resumes.
+    let progressKey: String
     /// The option the learner tapped, held while feedback shows.
     @State private var selected: String?
     private var locked: Bool { selected != nil }
@@ -98,11 +100,23 @@ struct RecallView: View {
             try? context.save()
             selected = nil
             session.advance()
+            persistProgress()
+        }
+    }
+
+    /// Save the round after every answer; clear it once the round is finished.
+    private func persistProgress() {
+        if session.isFinished {
+            StudyProgressStore.clear(progressKey)
+        } else {
+            StudyProgressStore.save(session.savedState, key: progressKey)
         }
     }
 
     private func restart() {
-        session = StudySession(cards: session.snapshotCards, mode: .recall, direction: session.direction)
+        StudyProgressStore.clear(progressKey)
+        session = StudySession(cards: session.snapshotCards, mode: .recall,
+                               direction: session.direction, shuffle: session.shuffle)
     }
 
     private func close() { dismiss() }
