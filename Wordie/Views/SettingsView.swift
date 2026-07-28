@@ -21,13 +21,13 @@ struct SettingsView: View {
                             Label("보관함", systemImage: "archivebox")
                         }
                     }
-                    .listRowBackground(Color.primary.opacity(0.04))
+                    .listRowBackground(Theme.rowFill)
 
                     Section {
                         placeholderRow("paintbrush", "테마")
                         placeholderRow("square.and.arrow.up", "단어장 내보내기")
                     }
-                    .listRowBackground(Color.primary.opacity(0.04))
+                    .listRowBackground(Theme.rowFill)
                 }
                 .scrollContentBackground(.hidden)
             }

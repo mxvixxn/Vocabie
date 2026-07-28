@@ -49,32 +49,20 @@ struct HomeView: View {
     }
 
     private var welcomeState: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "cloud.sun.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(Theme.tint.gradient)
-            Text("Wordie에 오신 걸 환영해요")
-                .font(.title3.weight(.semibold))
-            Text("세트 탭에서 첫 단어장을 만들어보세요.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(40)
+        EmptyStateView(
+            systemImage: "cloud.sun.fill",
+            title: "Wordie에 오신 걸 환영해요",
+            message: "세트 탭에서 첫 단어장을 만들어보세요."
+        )
     }
 
     private var allCaughtUpState: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(Theme.correct.gradient)
-            Text("오늘 복습할 단어가 없어요")
-                .font(.title3.weight(.semibold))
-            Text("잘하고 있어요. 내일 다시 확인해요.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .padding(40)
+        EmptyStateView(
+            systemImage: "checkmark.circle.fill",
+            title: "오늘 복습할 단어가 없어요",
+            message: "잘하고 있어요. 내일 다시 확인해요.",
+            tint: Theme.correct
+        )
     }
 }
 
@@ -104,6 +92,6 @@ private struct ReviewBanner: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(14)
-        .glassPanel(corner: 24, tint: Theme.tint)
+        .glassPanel(tint: Theme.tint)
     }
 }

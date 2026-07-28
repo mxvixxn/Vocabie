@@ -62,6 +62,7 @@ struct ArchiveView: View {
                         } label: {
                             Label("삭제", systemImage: "trash")
                         }
+                        .tint(.red)
                     }
             }
         }
@@ -70,18 +71,12 @@ struct ArchiveView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "archivebox")
-                .font(.system(size: 44))
-                .foregroundStyle(.secondary)
-            Text("보관한 단어장이 없어요")
-                .font(.headline)
-            Text("단어장을 왼쪽으로 밀어 보관하면 여기에 모여요.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(40)
+        EmptyStateView(
+            systemImage: "archivebox",
+            title: "보관한 단어장이 없어요",
+            message: "단어장을 왼쪽으로 밀어 보관하면 여기에 모여요.",
+            tint: .secondary
+        )
     }
 
     private func restore(_ set: VocabSet) {
@@ -118,8 +113,8 @@ private struct ArchivedRow: View {
             Image(systemName: "archivebox.fill")
                 .foregroundStyle(.tertiary)
         }
-        .padding(16)
-        .glassPanel(corner: 24)
+        .padding(Theme.contentPad)
+        .glassPanel()
         .contentShape(Rectangle())
     }
 }

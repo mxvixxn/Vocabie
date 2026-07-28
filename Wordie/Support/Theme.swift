@@ -30,10 +30,22 @@ enum Theme {
     }
 
     // MARK: Metrics
-    static let panelCorner: CGFloat = 28
-    static let innerCorner: CGFloat = 20
+    //
+    // Corners come in two tiers only: cards and the controls that sit on them.
+    /// Floating glass cards and panels.
+    static let panelCorner: CGFloat = 22
+    /// Buttons, small controls, and inset rows.
+    static let innerCorner: CGFloat = 14
     /// Inset that keeps floating glass clear of the screen edges.
     static let floatInset: CGFloat = 14
+
+    /// Standard gap between stacked sections, and padding inside a card.
+    static let sectionGap: CGFloat = 20
+    static let contentPad: CGFloat = 16
+
+    /// The one flat translucent fill for list rows and insets — so surfaces stop
+    /// drifting between 0.03 / 0.04 / 0.05 / 0.06.
+    static let rowFill = Color.primary.opacity(0.05)
 }
 
 // MARK: - Liquid Glass

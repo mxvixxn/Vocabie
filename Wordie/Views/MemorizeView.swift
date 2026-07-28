@@ -128,7 +128,7 @@ struct MemorizeView: View {
         let backLabel = direction == .termToMeaning ? "뜻" : "단어"
 
         return ZStack {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.panelCorner, style: .continuous)
                 .fill(cardFill)
                 .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.10),
                         radius: 22, x: 0, y: 12)
@@ -155,7 +155,7 @@ struct MemorizeView: View {
     /// A soft "done" card that peeks up as you swipe off the last word.
     private func finishPeek(size: CGSize) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.panelCorner, style: .continuous)
                 .fill(cardFill)
                 .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.10),
                         radius: 22, x: 0, y: 12)

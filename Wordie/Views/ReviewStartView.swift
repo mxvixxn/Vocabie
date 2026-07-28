@@ -79,7 +79,7 @@ struct ReviewStartView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
-        .glassPanel(corner: 24, tint: Theme.tint)
+        .glassPanel(tint: Theme.tint)
         .padding(.top, 8)
     }
 
@@ -121,7 +121,7 @@ struct ReviewStartView: View {
                             .foregroundStyle(.tertiary)
                     }
                     .padding(14)
-                    .glassPanel(corner: 24, tint: mode.color)
+                    .glassPanel(tint: mode.color)
                 }
                 .buttonStyle(.plain)
             }
@@ -142,7 +142,7 @@ struct ReviewStartView: View {
             Spacer()
         }
         .padding(14)
-        .glassPanel(corner: 20)
+        .glassPanel()
     }
 
     private var preview: some View {
@@ -168,8 +168,8 @@ struct ReviewStartView: View {
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 14)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.primary.opacity(0.05)))
+                .background(RoundedRectangle(cornerRadius: Theme.innerCorner, style: .continuous)
+                    .fill(Theme.rowFill))
             }
             if dueCards.count > 12 {
                 Text("… 외 \(dueCards.count - 12)개 더")

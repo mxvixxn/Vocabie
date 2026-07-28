@@ -133,7 +133,7 @@ struct SetDetailView: View {
                 .tint(Theme.tint)
         }
         .padding(16)
-        .glassPanel(corner: 24)
+        .glassPanel()
         .padding(.top, 8)
     }
 
@@ -248,7 +248,7 @@ struct SetDetailView: View {
             .foregroundStyle(shuffleStudy ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
             .padding(.horizontal, 14).padding(.vertical, 9)
             .background(
-                shuffleStudy ? AnyShapeStyle(Theme.tint) : AnyShapeStyle(Color.primary.opacity(0.06)),
+                shuffleStudy ? AnyShapeStyle(Theme.tint) : AnyShapeStyle(Theme.rowFill),
                 in: Capsule()
             )
         }
@@ -291,29 +291,16 @@ struct SetDetailView: View {
     @State private var editingWord: Vocab?
 
     private var emptyWords: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "tray")
-                .font(.system(size: 40))
-                .foregroundStyle(.secondary)
-            Text("단어가 아직 없어요")
-                .font(.headline)
-            Text("우측 상단 ＋ 에서 붙여넣기나 파일로\n단어를 한 번에 추가해 보세요.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button {
-                showingImport = true
-            } label: {
-                Label("대량 추가", systemImage: "doc.badge.plus")
-                    .font(.headline)
-                    .padding(.horizontal, 20).padding(.vertical, 11)
-                    .background(Theme.tint, in: Capsule())
-                    .foregroundStyle(.white)
-            }
+        EmptyStateView(
+            systemImage: "tray",
+            title: "단어가 아직 없어요",
+            message: "우측 상단 ＋ 에서 붙여넣기나 파일로\n단어를 한 번에 추가해 보세요.",
+            actionTitle: "대량 추가",
+            actionImage: "doc.badge.plus"
+        ) {
+            showingImport = true
         }
-        .padding(20)
-        .glassPanel(corner: 24)
-        .padding(.top, 30)
+        .padding(.top, 20)
     }
 
     // MARK: Set management
@@ -391,7 +378,7 @@ private struct ModeCard: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(14)
-        .glassPanel(corner: 24, tint: mode.color)
+        .glassPanel(tint: mode.color)
     }
 }
 
@@ -429,7 +416,7 @@ private struct WordRow: View {
         .padding(.horizontal, 14)
         // Content, not a control — a quiet fill instead of glass, so a long list
         // doesn't turn into a stack of competing panes.
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(Color.primary.opacity(0.05)))
+        .background(RoundedRectangle(cornerRadius: Theme.innerCorner, style: .continuous)
+            .fill(Theme.rowFill))
     }
 }

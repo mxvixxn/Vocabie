@@ -133,6 +133,7 @@ struct SetsView: View {
                     } label: {
                         Label("삭제", systemImage: "trash")
                     }
+                    .tint(.red)
                     Button {
                         archive(set)
                     } label: {
@@ -150,30 +151,16 @@ struct SetsView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "cloud.sun.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(Theme.tint.gradient)
-            Text("아직 단어장이 없어요")
-                .font(.title3.weight(.semibold))
-            Text("＋ 버튼을 눌러 첫 단어장을 만들고\nCSV·엑셀·텍스트를 붙여넣어 보세요.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button {
-                Haptics.soft()
-                showingNewSet = true
-            } label: {
-                Label("단어장 만들기", systemImage: "plus")
-                    .font(.headline)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 12)
-                    .background(Theme.tint, in: Capsule())
-                    .foregroundStyle(.white)
-            }
-            .padding(.top, 4)
+        EmptyStateView(
+            systemImage: "cloud.sun.fill",
+            title: "아직 단어장이 없어요",
+            message: "＋ 버튼을 눌러 첫 단어장을 만들고\nCSV·엑셀·텍스트를 붙여넣어 보세요.",
+            actionTitle: "단어장 만들기",
+            actionImage: "plus"
+        ) {
+            Haptics.soft()
+            showingNewSet = true
         }
-        .padding(40)
     }
 }
 
@@ -232,8 +219,8 @@ private struct SetRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(16)
-        .glassPanel(corner: 24)
+        .padding(Theme.contentPad)
+        .glassPanel()
         // Flatten the hit region back to a plain rectangle. The glass container
         // shapes its own, which can leave the row's swipe area ill-defined.
         .contentShape(Rectangle())

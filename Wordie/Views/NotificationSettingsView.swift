@@ -25,7 +25,7 @@ struct NotificationSettingsView: View {
                 } footer: {
                     Text("정한 시간에 복습을 떠올리도록 매일 알려드려요.")
                 }
-                .listRowBackground(Color.primary.opacity(0.04))
+                .listRowBackground(Theme.rowFill)
             }
             .scrollContentBackground(.hidden)
         }
