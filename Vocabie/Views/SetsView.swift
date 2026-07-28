@@ -15,7 +15,7 @@ struct SetsView: View {
     @State private var renameTarget: VocabSet?
     @State private var draftTitle = ""
 
-    @AppStorage("wordie.hasSeenSwipeTutorial") private var hasSeenSwipeTutorial = false
+    @AppStorage("vocabie.hasSeenSwipeTutorial") private var hasSeenSwipeTutorial = false
 
     var body: some View {
         NavigationStack {

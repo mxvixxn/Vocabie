@@ -3,7 +3,7 @@ import SwiftData
 
 /// Today's review: every card across every set whose due date has arrived.
 ///
-/// This is what turns Wordie from "I cleared 60 words tonight" into "I still know them
+/// This is what turns Vocabie from "I cleared 60 words tonight" into "I still know them
 /// next month" — session repetition only fixes a word for today.
 struct ReviewStartView: View {
     @Environment(\.modelContext) private var context

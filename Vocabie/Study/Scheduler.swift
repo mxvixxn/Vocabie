@@ -2,7 +2,7 @@ import Foundation
 
 /// How a card went during a study session.
 ///
-/// Unlike Anki, Wordie doesn't ask the learner to rate themselves — it already knows.
+/// Unlike Anki, Vocabie doesn't ask the learner to rate themselves — it already knows.
 /// Recall and spell produce an objective record of how many attempts a card took,
 /// which is a better signal than self-assessment.
 enum ReviewGrade {

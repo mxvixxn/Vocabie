@@ -40,7 +40,7 @@ struct NotificationSettingsView: View {
             Button("설정 열기") { openSystemSettings() }
             Button("취소", role: .cancel) { }
         } message: {
-            Text("기기 설정에서 Wordie 알림을 켜야 리마인더를 받을 수 있어요.")
+            Text("기기 설정에서 Vocabie 알림을 켜야 리마인더를 받을 수 있어요.")
         }
     }
 

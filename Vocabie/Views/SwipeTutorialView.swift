@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// One-time overlay teaching the 단어장 row gestures — 왼쪽 = 이름 변경, 오른쪽 = 삭제.
-/// Shown once on first launch, dismissed and remembered via `wordie.hasSeenSwipeTutorial`.
+/// Shown once on first launch, dismissed and remembered via `vocabie.hasSeenSwipeTutorial`.
 struct SwipeTutorialView: View {
     let onDismiss: () -> Void
 

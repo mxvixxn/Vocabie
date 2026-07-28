@@ -3,7 +3,7 @@ import UserNotifications
 
 /// A single repeating daily local notification that nudges the learner to review.
 enum ReviewReminder {
-    private static let identifier = "wordie.dailyReviewReminder"
+    private static let identifier = "vocabie.dailyReviewReminder"
 
     /// Asks for permission. Returns whether notifications are allowed.
     static func requestAuthorization() async -> Bool {

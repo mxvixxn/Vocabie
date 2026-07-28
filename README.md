@@ -1,7 +1,7 @@
-# 📚 Wordie (워디)
+# 📚 Vocabie (워디)
 
 > **"클래스카드처럼 외우고 싶어서 직접 만든 단어 암기 앱."**
-> Wordie는 학교를 졸업해 더 이상 선생님의 '클래스'가 없어도, 나 혼자서 **암기 → 리콜 → 스펠** 방식으로 단어를 반복 학습할 수 있는 iOS 앱이에요.
+> Vocabie는 학교를 졸업해 더 이상 선생님의 '클래스'가 없어도, 나 혼자서 **암기 → 리콜 → 스펠** 방식으로 단어를 반복 학습할 수 있는 iOS 앱이에요.
 > CSV·엑셀·텍스트·마크다운을 붙여넣거나 파일로 불러와 수백 개의 단어도 한 번에 수록할 수 있어요.
 
 <br>
@@ -36,8 +36,8 @@
 ## 📁 프로젝트 구조
 
 ```
-Wordie/
-├── WordieApp.swift          # 앱 진입점 · ModelContainer
+Vocabie/
+├── VocabieApp.swift          # 앱 진입점 · ModelContainer
 ├── Models/
 │   ├── VocabSet.swift       # 단어장
 │   └── Vocab.swift          # 단어 카드

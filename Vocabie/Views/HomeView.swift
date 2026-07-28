@@ -40,7 +40,7 @@ struct HomeView: View {
                     }
                 }
             }
-            .navigationTitle("Wordie")
+            .navigationTitle("Vocabie")
         }
         .tint(Theme.tint)
         .sheet(isPresented: $showingReview) {
@@ -51,7 +51,7 @@ struct HomeView: View {
     private var welcomeState: some View {
         EmptyStateView(
             systemImage: "cloud.sun.fill",
-            title: "Wordie에 오신 걸 환영해요",
+            title: "Vocabie에 오신 걸 환영해요",
             message: "세트 탭에서 첫 단어장을 만들어보세요."
         )
     }

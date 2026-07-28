@@ -1,4 +1,4 @@
-# Wordie 작업 계획
+# Vocabie 작업 계획
 
 _2026-07-27 기준 · 커밋 4개 · Swift 파일 20개 · **빌드 미검증**_
 
@@ -22,8 +22,8 @@ _2026-07-27 기준 · 커밋 4개 · Swift 파일 20개 · **빌드 미검증**_
 ## 1단계 — 빌드 검증 (맥 앞에서 제일 먼저)
 
 ```bash
-cd ~/.../Wordie
-xcodebuild -project Wordie.xcodeproj -scheme Wordie \
+cd ~/.../Vocabie
+xcodebuild -project Vocabie.xcodeproj -scheme Vocabie \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -configuration Debug build 2>&1 | tail -40
 ```

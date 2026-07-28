@@ -1,4 +1,4 @@
-# Wordie — Liquid Glass 적용 노트
+# Vocabie — Liquid Glass 적용 노트
 
 - **날짜**: 2026-07-27
 - **배포 타깃**: iOS 26.0 (Moodie Sky 26.4 / Fitie 26.0 과 같은 계열)
@@ -9,7 +9,7 @@ Moodie Sky 설계 문서의 비목표를 그대로 승계한다:
 
 > 커스텀 유리 바(`.ultraThinMaterial` 등) 직접 제작 금지. 순정보다 열등하고 OS 업데이트마다 깨짐.
 
-초기 Wordie MVP는 `cardSurface()`라는 `.ultraThinMaterial` 래퍼를 **모든 카드에** 둘렀다. 이번 작업에서 전부 걷어냈다.
+초기 Vocabie MVP는 `cardSurface()`라는 `.ultraThinMaterial` 래퍼를 **모든 카드에** 둘렀다. 이번 작업에서 전부 걷어냈다.
 
 ### 층 분리 (이 디자인의 핵심)
 
@@ -86,7 +86,7 @@ GlassEffectContainer(spacing: 20) { ... }
 
 # 발음 듣기 (TTS)
 
-`Wordie/Audio/Speaker.swift` — `AVSpeechSynthesizer` 기반. 애플 번역·VoiceOver와 **같은 시스템 음성**을 쓴다. 무료·오프라인·서버 불필요.
+`Vocabie/Audio/Speaker.swift` — `AVSpeechSynthesizer` 기반. 애플 번역·VoiceOver와 **같은 시스템 음성**을 쓴다. 무료·오프라인·서버 불필요.
 
 ## 무음 스위치 대응
 
@@ -122,7 +122,7 @@ try session.setActive(true)
 
 # 간격 반복 (Spaced Repetition)
 
-`Wordie/Study/Scheduler.swift`
+`Vocabie/Study/Scheduler.swift`
 
 ## 왜 필요한가
 
@@ -130,7 +130,7 @@ try session.setActive(true)
 
 ## 자기 평가를 안 받는 이유
 
-Anki는 사용자에게 Again/Hard/Good/Easy를 직접 고르게 한다. Wordie는 그럴 필요가 없다 — 리콜·스펠이 **몇 번 만에 맞혔는지** 이미 객관적으로 안다. 자기 평가보다 나은 신호다.
+Anki는 사용자에게 Again/Hard/Good/Easy를 직접 고르게 한다. Vocabie는 그럴 필요가 없다 — 리콜·스펠이 **몇 번 만에 맞혔는지** 이미 객관적으로 안다. 자기 평가보다 나은 신호다.
 
 ```
 세션 중 틀린 횟수 → 등급
@@ -185,7 +185,7 @@ Anki는 사용자에게 Again/Hard/Good/Easy를 직접 고르게 한다. Wordie�
 
 # 파서 — 영어/한글 경계로 자르기
 
-`Wordie/Import/WordParser.swift`
+`Vocabie/Import/WordParser.swift`
 
 ## 고친 버그
 

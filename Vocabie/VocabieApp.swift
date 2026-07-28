@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct WordieApp: App {
+struct VocabieApp: App {
     /// Shared SwiftData stack for the whole app.
     let container: ModelContainer
 

@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 #endif
 
-/// Wordie's visual language.
+/// Vocabie's visual language.
 ///
 /// Layering rule — the whole design depends on it:
 /// - **Content layer** (the word, its meaning) sits directly on the background. No material.
