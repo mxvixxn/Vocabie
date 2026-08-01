@@ -67,7 +67,7 @@ struct ImportWordsView: View {
                 Button("중복 포함해 모두 추가") { commit(includingDuplicates: true) }
                 Button("취소", role: .cancel) { }
             } message: {
-                Text("\(duplicateSummary)\n이미 단어장에 있는 단어예요. 어떻게 할까요?")
+                Text("\(duplicateSummary)\n이미 이 세트에 있는 단어예요. 어떻게 할까요?")
             }
         }
     }

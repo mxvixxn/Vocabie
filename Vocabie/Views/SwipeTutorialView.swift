@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One-time overlay teaching the 단어장 row gestures — 왼쪽 = 이름 변경, 오른쪽 = 삭제.
+/// One-time overlay teaching the library row gestures — 왼쪽 = 이름 변경, 오른쪽 = 삭제.
 /// Shown once on first launch, dismissed and remembered via `vocabie.hasSeenSwipeTutorial`.
 struct SwipeTutorialView: View {
     let onDismiss: () -> Void
@@ -18,10 +18,10 @@ struct SwipeTutorialView: View {
                 Spacer()
 
                 VStack(spacing: 8) {
-                    Text("단어장 정리하기")
+                    Text("단어장·세트 정리하기")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(.white)
-                    Text("단어장을 좌우로 밀어보세요")
+                    Text("목록을 좌우로 밀어보세요")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.75))
                 }
@@ -79,7 +79,7 @@ struct SwipeTutorialView: View {
             }
 
             HStack {
-                Text("예문 단어장")
+                Text("예문 세트")
                     .font(.headline)
                 Spacer()
                 Text("12단어")

@@ -44,6 +44,7 @@ enum WordParser {
             let line = rawLine.trimmed
             guard !line.isEmpty else { continue }
             guard !isMarkdownSeparator(line) else { continue }
+            guard !isSectionHeader(line) else { continue }
 
             if var row = parseLine(line, delimiter: delimiter) {
                 if swapColumns { swap(&row.term, &row.meaning) }
@@ -84,6 +85,11 @@ enum WordParser {
     private static func autoSplit(_ line: String) -> ParsedRow? {
         // A tab is an explicit column break — pasted straight out of a spreadsheet.
         if line.contains("\t") { return splitOnce(line, "\t") }
+
+        // So is a quoted field. Trust it over the script boundary below, which would
+        // otherwise split *inside* the quotes and leave the term as `deposit,"`.
+        // This is the shape Excel writes, and the shape Vocabie's own CSV export uses.
+        if line.contains("\""), let row = csvRow(line), row.isUsable { return row }
 
         // For an English↔Korean deck, the point where the script changes is the most
         // reliable boundary there is. It survives hyphens inside the term
@@ -231,17 +237,52 @@ enum WordParser {
 
     // MARK: - Helpers
 
+    /// Removes list numbering and leading decoration from a line.
+    ///
+    /// Study material marks its hard words with asterisks or stars (`* term`,
+    /// `** term`, `*** term`) — importance, not part of the word, so it goes. The two
+    /// shapes interleave freely (`15. ** sentient`), so this strips in a loop rather
+    /// than assuming an order; each pass consumes at least one character, so it ends.
     private static func stripBullet(_ line: String) -> String {
-        var s = line
-        for prefix in ["- ", "* ", "• ", "· "] {
-            if s.hasPrefix(prefix) { s = String(s.dropFirst(prefix.count)); break }
+        var s = line.trimmed
+        var keepGoing = true
+        while keepGoing {
+            keepGoing = false
+            for pattern in [markerPrefix, numberingPrefix] {
+                guard let range = s.range(of: pattern, options: .regularExpression) else { continue }
+                s = String(s[range.upperBound...]).trimmed
+                keepGoing = true
+            }
         }
-        // Numbered lists: "1. term …"
-        if let range = s.range(of: #"^\d+[.)]\s+"#, options: .regularExpression) {
-            s = String(s[range.upperBound...])
-        }
-        return s.trimmed
+        return s
     }
+
+    /// Importance marks and bullets. Asterisks and stars come in runs and often sit
+    /// tight against the word (`**sentient`), so the space is optional for them; a
+    /// dash needs one, or it would eat the hyphen off a term like `-ology`.
+    private static let markerPrefix = #"^(?:[*★☆✦•·]+\s*|[-–—]\s+)"#
+
+    /// Numbered lists: "1. term …", "12) term …"
+    private static let numberingPrefix = #"^\d+[.)]\s+"#
+
+    /// A question-number heading that rides along when a learner copies a mock exam
+    /// section by section — `43~45번 (13)`, `39번 (15)`, `[41~42]번`.
+    ///
+    /// These have to be caught here, before splitting: `43~45번 (13)` divides at the
+    /// script boundary into a perfectly well-formed row (term `43~45`, meaning
+    /// `번 (13)`) and lands in the deck as a word.
+    ///
+    /// Deliberately narrow — the line must open with a number and a Korean counter
+    /// *and* carry no word letters beyond that counter. A real card like
+    /// `1번 타자 - leadoff hitter` keeps its Latin half and survives.
+    private static func isSectionHeader(_ line: String) -> Bool {
+        let s = stripBullet(line)
+        guard s.range(of: sectionHeading, options: .regularExpression) != nil else { return false }
+        return !s.contains { $0.isWordLetter }
+    }
+
+    private static let sectionHeading =
+        #"^[\[\(（【<]?\s*\d+\s*(?:[~∼〜～\-–—]\s*\d+\s*)?[\]\)）】>]?\s*(?:번|강|과|회|일차|차시)"#
 
     /// Markdown table divider like `|---|:--:|` — carries no data.
     private static func isMarkdownSeparator(_ line: String) -> Bool {
@@ -257,6 +298,10 @@ extension String {
 }
 
 extension Character {
+    /// A letter that could carry meaning in a term, i.e. anything but Hangul.
+    /// Used to tell a bare Korean heading from a real card with an English half.
+    var isWordLetter: Bool { isLetter && !isHangul }
+
     /// Any Korean letter — precomposed syllables plus both Jamo blocks.
     var isHangul: Bool {
         unicodeScalars.contains { scalar in

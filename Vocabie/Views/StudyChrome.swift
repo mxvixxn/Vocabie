@@ -219,6 +219,55 @@ struct WordStage: View {
     }
 }
 
+/// The beat after an answer in 리콜 / 스펠: the meaning lands large with the English
+/// term and its pronunciation underneath.
+///
+/// Both modes only ever show one half of the pair while the question is open. This is
+/// where the other half arrives — and a miss needs it more than a hit, so the two land
+/// on the same screen with only the kicker telling them apart.
+struct AnswerReveal: View {
+    let kicker: String
+    /// Green for a hit, red for a miss — the kicker alone carries the verdict.
+    let tint: Color
+    let term: String
+    let meaning: String
+    var note: String = ""
+    /// The mode's colour, for the term line and its speaker.
+    let accent: Color
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(kicker)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+
+            Text(meaning)
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.45)
+                .lineLimit(3)
+
+            HStack(spacing: 4) {
+                Text(term)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                SpeakButton(text: term, accent: accent)
+            }
+
+            if !note.isEmpty {
+                Text(note)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, 26)
+        .transition(.opacity)
+    }
+}
+
 /// Small inline button that pronounces a word, like the speaker in Translate.
 struct SpeakButton: View {
     let text: String
@@ -247,9 +296,17 @@ struct SpeakButton: View {
 // MARK: - Completion
 
 /// Shown when a session clears every card.
+///
+/// When there is more of the same material waiting — the next 묶음, or the next 세트
+/// on the same 단어장 — the offer to keep going is the primary button. Momentum at the
+/// finish line is the whole point: the learner is already here, already warmed up.
 struct StudyCompleteView: View {
     let mode: StudyMode
     let total: Int
+    /// What comes next, e.g. "묶음 3 · 21–30" or "36-40". `nil` when nothing follows,
+    /// or when the learner has asked not to be offered it.
+    var nextTitle: String? = nil
+    var onNext: (() -> Void)? = nil
     let onRestart: () -> Void
     let onClose: () -> Void
 
@@ -267,11 +324,24 @@ struct StudyCompleteView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .padding(.top, 6)
+            if let nextTitle {
+                Text("다음: \(nextTitle)")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(mode.color)
+                    .padding(.top, 14)
+            }
             Spacer()
 
             FloatingPanel(tint: mode.color) {
-                PanelButton(title: "한 번 더", systemImage: "arrow.clockwise",
-                            fill: mode.color, solid: true, action: onRestart)
+                if let nextTitle, let onNext {
+                    PanelButton(title: "‘\(nextTitle)’ 이어서", systemImage: "arrow.right",
+                                fill: mode.color, solid: true, action: onNext)
+                    PanelButton(title: "한 번 더", systemImage: "arrow.clockwise",
+                                action: onRestart)
+                } else {
+                    PanelButton(title: "한 번 더", systemImage: "arrow.clockwise",
+                                fill: mode.color, solid: true, action: onRestart)
+                }
                 PanelButton(title: "끝내기", action: onClose)
             }
         }

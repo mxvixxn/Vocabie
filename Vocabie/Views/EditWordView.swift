@@ -63,7 +63,7 @@ struct EditWordView: View {
                 Button("그래도 추가") { addNew() }
                 Button("취소", role: .cancel) { }
             } message: {
-                Text("‘\(term.trimmed)’은(는) 이미 단어장에 있어요. 그래도 추가할까요?")
+                Text("‘\(term.trimmed)’은(는) 이미 이 세트에 있어요. 그래도 추가할까요?")
             }
         }
     }

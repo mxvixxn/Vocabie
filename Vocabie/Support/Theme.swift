@@ -12,8 +12,27 @@ import UIKit
 /// Putting glass behind the word lets the background bleed through and makes it harder to
 /// read, which is the opposite of what a vocabulary app needs.
 enum Theme {
+    // MARK: Theme storage
+
+    static let appearanceKey = "themeAppearance"
+    static let accentKey = "themeAccent"
+
+    /// The accent the learner picked. Read from storage rather than held in the
+    /// environment so the hundreds of `Theme.tint` call sites need no changes; the
+    /// root observes the key and re-renders the tree when it changes.
+    static var accent: AccentTheme {
+        AccentTheme(rawValue: UserDefaults.standard.string(forKey: accentKey) ?? "")
+            ?? .periwinkle
+    }
+
     // MARK: Palette
-    static let tint = Color(red: 0.40, green: 0.52, blue: 0.96)      // periwinkle
+
+    /// The app accent — buttons, progress, selected states. Follows the chosen theme.
+    static var tint: Color { accent.color }
+
+    // The three study modes keep their own colours whatever the accent is: 암기 / 리콜 /
+    // 스펠 are told apart by hue during a session, and re-tinting them to match the
+    // theme would erase that.
     static let memorize = Color(red: 0.44, green: 0.55, blue: 0.96)  // 암기 — blue
     static let recall = Color(red: 0.58, green: 0.47, blue: 0.94)    // 리콜 — violet
     static let spell = Color(red: 0.36, green: 0.66, blue: 0.72)     // 스펠 — teal
@@ -21,11 +40,23 @@ enum Theme {
     static let wrong = Color(red: 0.91, green: 0.35, blue: 0.38)
     static let star = Color(red: 0.98, green: 0.78, blue: 0.36)
 
+    /// The same verdicts, darkened for surfaces that carry white text. The accent
+    /// versions above are tuned for text and icons *on* the background; filling a
+    /// whole row with them leaves white at 2.4:1, well under the 4.5:1 floor.
+    static let correctFill = Color(red: 0.18, green: 0.52, blue: 0.36)
+    static let wrongFill = Color(red: 0.76, green: 0.20, blue: 0.24)
+
     /// The soft sky backdrop. Everything else floats above this.
+    ///
+    /// Carries a breath of the accent — enough that switching theme changes the room
+    /// rather than just the buttons, far too little to compete with the words on top.
     static func background(_ scheme: ColorScheme) -> LinearGradient {
+        let wash = accent.color
         let colors: [Color] = scheme == .dark
-            ? [Color(red: 0.09, green: 0.10, blue: 0.17), Color(red: 0.13, green: 0.14, blue: 0.22)]
-            : [Color(red: 0.93, green: 0.95, blue: 1.0), Color(red: 0.97, green: 0.96, blue: 1.0)]
+            ? [Color(red: 0.09, green: 0.10, blue: 0.17).mixed(with: wash, 0.10),
+               Color(red: 0.13, green: 0.14, blue: 0.22).mixed(with: wash, 0.06)]
+            : [Color(red: 0.94, green: 0.95, blue: 0.99).mixed(with: wash, 0.10),
+               Color(red: 0.98, green: 0.98, blue: 1.0).mixed(with: wash, 0.04)]
         return LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
     }
 
@@ -46,6 +77,76 @@ enum Theme {
     /// The one flat translucent fill for list rows and insets — so surfaces stop
     /// drifting between 0.03 / 0.04 / 0.05 / 0.06.
     static let rowFill = Color.primary.opacity(0.05)
+}
+
+// MARK: - Theme choices
+
+/// Light, dark, or whatever the phone is doing.
+enum AppearanceMode: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    var id: String { rawValue }
+
+    var korean: String {
+        switch self {
+        case .system: "시스템"
+        case .light: "밝게"
+        case .dark: "어둡게"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .system: "iphone"
+        case .light: "sun.max.fill"
+        case .dark: "moon.fill"
+        }
+    }
+
+    /// `nil` hands the decision back to the system.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+}
+
+/// The accent colour. Every option is tuned to stay legible as white-on-colour at
+/// button size and as colour-on-background for small text, in both schemes.
+enum AccentTheme: String, CaseIterable, Identifiable {
+    case periwinkle, lavender, teal, coral, forest
+
+    var id: String { rawValue }
+
+    var korean: String {
+        switch self {
+        case .periwinkle: "페리윙클"
+        case .lavender: "라벤더"
+        case .teal: "민트"
+        case .coral: "코랄"
+        case .forest: "포레스트"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .periwinkle: Color(red: 0.40, green: 0.52, blue: 0.96)
+        case .lavender: Color(red: 0.58, green: 0.47, blue: 0.94)
+        case .teal: Color(red: 0.20, green: 0.62, blue: 0.68)
+        case .coral: Color(red: 0.91, green: 0.44, blue: 0.42)
+        case .forest: Color(red: 0.25, green: 0.60, blue: 0.45)
+        }
+    }
+}
+
+extension Color {
+    /// Blend towards another colour by `amount` (0...1). Used to wash the backdrop
+    /// with a trace of the accent.
+    func mixed(with other: Color, _ amount: Double) -> Color {
+        mix(with: other, by: amount)
+    }
 }
 
 // MARK: - Liquid Glass

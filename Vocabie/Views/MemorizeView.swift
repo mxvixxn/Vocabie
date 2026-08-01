@@ -13,6 +13,9 @@ struct MemorizeView: View {
 
     let cards: [Vocab]
     let direction: StudyDirection
+    /// What to offer at the finish line, when more material follows this pass.
+    var nextTitle: String? = nil
+    var onNext: (() -> Void)? = nil
 
     @AppStorage("autoSpeak") private var autoSpeak = true
 
@@ -53,6 +56,7 @@ struct MemorizeView: View {
 
             if finished {
                 StudyCompleteView(mode: .memorize, total: cards.count,
+                                  nextTitle: nextTitle, onNext: onNext,
                                   onRestart: restart, onClose: { dismiss() })
             } else {
                 StudyScaffold(

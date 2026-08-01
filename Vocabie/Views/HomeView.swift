@@ -3,15 +3,20 @@ import SwiftData
 
 /// 홈 tab: today's review at a glance.
 struct HomeView: View {
+    /// The accent's raw value, passed down purely so a theme change re-renders this
+    /// tab. See the note at the bottom of `MainTabView`.
+    var theme: String = ""
+
     @Environment(\.colorScheme) private var scheme
     @Query private var sets: [VocabSet]
 
     @State private var showingReview = false
 
     /// Every card across every active set whose review date has arrived, hardest first.
-    /// Archived sets are set aside, so they don't pull cards into today's review.
+    /// Archived sets are set aside, so they don't pull cards into today's review — and
+    /// so is everything on an archived 단어장.
     private var dueCards: [Vocab] {
-        sets.filter { !$0.isArchived }
+        sets.filter(\.isActive)
             .flatMap { $0.dueWords() }
             .sorted { $0.lapses > $1.lapses }
     }
@@ -52,7 +57,7 @@ struct HomeView: View {
         EmptyStateView(
             systemImage: "cloud.sun.fill",
             title: "Vocabie에 오신 걸 환영해요",
-            message: "세트 탭에서 첫 단어장을 만들어보세요."
+            message: "단어장 탭에서 첫 세트를 만들어보세요."
         )
     }
 

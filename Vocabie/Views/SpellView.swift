@@ -16,9 +16,14 @@ struct SpellView: View {
     @State var session: StudySession
     /// Key under which this round's progress is saved, so leaving mid-way resumes.
     let progressKey: String
+    /// What to offer at the finish line, when more material follows this round.
+    var nextTitle: String? = nil
+    var onNext: (() -> Void)? = nil
     @State private var typed = ""
     @State private var phase: Phase = .typing
     @State private var usedHint = false
+
+    @AppStorage("autoSpeak") private var autoSpeak = true
 
     private enum Phase { case typing, correct, missed }
 
@@ -31,6 +36,7 @@ struct SpellView: View {
 
             if session.isFinished {
                 StudyCompleteView(mode: .spell, total: session.total,
+                                  nextTitle: nextTitle, onNext: onNext,
                                   onRestart: restart, onClose: close)
             } else {
                 StudyScaffold(
@@ -41,26 +47,54 @@ struct SpellView: View {
                     compactPill: tight,
                     onClose: close
                 ) {
-                    WordStage(
-                        kicker: session.direction == .meaningToTerm
-                            ? "뜻을 보고 단어를 입력하세요" : "단어를 보고 뜻을 입력하세요",
-                        word: session.prompt,
-                        note: session.promptNote,
-                        accent: Theme.spell,
-                        // The prompt keeps only the word once the keyboard is up.
-                        showsChrome: !tight,
-                        size: tight ? 30 : 34
-                    )
+                    switch phase {
+                    case .typing:
+                        WordStage(
+                            kicker: session.direction == .meaningToTerm
+                                ? "뜻을 보고 단어를 입력하세요" : "단어를 보고 뜻을 입력하세요",
+                            word: session.prompt,
+                            note: session.promptNote,
+                            accent: Theme.spell,
+                            // The prompt keeps only the word once the keyboard is up.
+                            showsChrome: !tight,
+                            size: tight ? 30 : 34
+                        )
+                    case .correct:
+                        resultStage(kicker: "정답!", tint: Theme.correct)
+                    case .missed:
+                        resultStage(kicker: "정답은", tint: Theme.wrong)
+                    }
                 } panel: {
                     FloatingPanel(tint: Theme.spell) {
-                        answerField
-                        if phase == .missed { answerReveal }
+                        // The stage carries the answer now. The panel only echoes what
+                        // was typed, and only when there is something to compare against
+                        // — after a hint there is nothing to show.
+                        if phase == .typing || (phase == .missed && !typed.trimmed.isEmpty) {
+                            answerField
+                        }
                         controls
                     }
                 }
             }
         }
         .onAppear { fieldFocused = true }
+        .onDisappear { Speaker.shared.stop() }
+    }
+
+    // MARK: Stage
+
+    private var currentTerm: String { session.current?.term ?? "" }
+    private var currentMeaning: String { session.current?.meaning ?? "" }
+
+    private func resultStage(kicker: String, tint: Color) -> some View {
+        AnswerReveal(
+            kicker: kicker,
+            tint: tint,
+            term: currentTerm,
+            meaning: currentMeaning,
+            note: session.promptNote,
+            accent: Theme.spell
+        )
     }
 
     // MARK: Panel contents
@@ -89,28 +123,6 @@ struct SpellView: View {
         case .correct: Theme.correct.opacity(0.25)
         case .missed:  Theme.wrong.opacity(0.16)   // a soft red says "not quite"
         }
-    }
-
-    private var answerReveal: some View {
-        VStack(spacing: 2) {
-            Text("정답")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 4) {
-                Text(session.expectedAnswer)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(Theme.spell)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                // The answer is the English term when spelling from a meaning.
-                if session.direction == .meaningToTerm {
-                    SpeakButton(text: session.expectedAnswer, accent: Theme.spell)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .transition(.opacity)
     }
 
     @ViewBuilder
@@ -143,10 +155,13 @@ struct SpellView: View {
         // 따닥 on a hit, 따다닥 (FaceID-fail) on a miss.
         ok ? Haptics.success() : Haptics.intenseError()
 
+        reveal()
+
         if ok {
-            // Hold the green long enough to clearly register the win before moving on.
+            // A hit moves on by itself; a miss waits for 다음, so the learner decides
+            // how long to sit with the word they just got wrong.
             Task {
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                try? await Task.sleep(nanoseconds: 2_200_000_000)
                 if phase == .correct { proceed() }
             }
         }
@@ -156,6 +171,13 @@ struct SpellView: View {
         usedHint = true
         withAnimation(.easeInOut(duration: 0.2)) { phase = .missed }
         Haptics.nudge()
+        reveal()
+    }
+
+    /// Step the keyboard aside so the stage gets the full screen, and say the word.
+    private func reveal() {
+        fieldFocused = false
+        if autoSpeak { Speaker.shared.speak(currentTerm) }
     }
 
     private func proceed() {

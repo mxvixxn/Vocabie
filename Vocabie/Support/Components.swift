@@ -37,6 +37,29 @@ struct SecondaryButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Sharing
+
+/// The system share sheet, for handing an exported file to Files, Mail, AirDrop…
+///
+/// A plain `ShareLink` would need the file to exist before the view body runs, which
+/// means writing to disk on every render. Presenting this from a button instead lets
+/// the file be written once, when the learner actually asks for it.
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) { }
+}
+
+/// A file waiting to be shared. Wrapped so `.sheet(item:)` can drive the share sheet.
+struct ShareableFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 // MARK: - Empty state
 //
 // One shape for every "nothing here yet" screen — Home, Sets, Archive, Set detail.

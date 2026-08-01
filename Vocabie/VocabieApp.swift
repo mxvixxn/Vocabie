@@ -8,7 +8,7 @@ struct VocabieApp: App {
 
     init() {
         do {
-            container = try ModelContainer(for: VocabSet.self, Vocab.self)
+            container = try ModelContainer(for: Notebook.self, VocabSet.self, Vocab.self)
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
