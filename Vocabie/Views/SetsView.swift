@@ -25,6 +25,7 @@ struct SetsView: View {
 
     @State private var showingNewSet = false
     @State private var showingNewNotebook = false
+    @State private var showingImportSets = false
     @State private var actions = SetActions()
     /// Drag-to-reorder is behind a mode: the rows already carry swipe actions, and a
     /// list that reorders on every long press fights them.
@@ -83,6 +84,12 @@ struct SetsView: View {
                             } label: {
                                 Label("새 세트", systemImage: "square.stack")
                             }
+                            Button {
+                                Haptics.soft()
+                                showingImportSets = true
+                            } label: {
+                                Label("붙여넣기로 단어장 만들기", systemImage: "doc.on.clipboard")
+                            }
                             if notebooks.count + looseSets.count > 1 {
                                 Divider()
                                 Button {
@@ -105,6 +112,9 @@ struct SetsView: View {
             }
             .sheet(isPresented: $showingNewNotebook) {
                 NewNotebookView()
+            }
+            .sheet(isPresented: $showingImportSets) {
+                ImportSetsView()
             }
             .setActionDialogs(actions)
             .confirmationDialog(

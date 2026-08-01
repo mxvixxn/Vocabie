@@ -12,6 +12,7 @@ struct NotebookDetailView: View {
     @Bindable var notebook: Notebook
 
     @State private var showingNewSet = false
+    @State private var showingImportSets = false
     @State private var showingRename = false
     @State private var confirmingDelete = false
     @State private var draftTitle = ""
@@ -51,6 +52,12 @@ struct NotebookDetailView: View {
                     } label: {
                         Label("이 단어장에 세트 추가", systemImage: "plus")
                     }
+                    Button {
+                        Haptics.soft()
+                        showingImportSets = true
+                    } label: {
+                        Label("붙여넣기로 세트 여러 개", systemImage: "doc.on.clipboard")
+                    }
                     if sets.count > 1 {
                         Button {
                             Haptics.soft()
@@ -80,6 +87,9 @@ struct NotebookDetailView: View {
         }
         .sheet(isPresented: $showingNewSet) {
             NewSetView(notebook: notebook)
+        }
+        .sheet(isPresented: $showingImportSets) {
+            ImportSetsView(notebook: notebook)
         }
         .setActionDialogs(actions)
         .alert("이름 변경", isPresented: $showingRename) {

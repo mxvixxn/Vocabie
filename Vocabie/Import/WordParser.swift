@@ -10,6 +10,19 @@ struct ParsedRow: Identifiable, Equatable {
     var isUsable: Bool { !term.trimmed.isEmpty && !meaning.trimmed.isEmpty }
 }
 
+/// A run of rows that sat under one heading in the pasted text.
+///
+/// Study material arrives in labelled chunks — a mock exam's `43~45번`, a textbook's
+/// `3강` — and those labels are exactly the 세트 boundaries a learner would draw by
+/// hand. Keeping them lets an import lay down several sets in one paste.
+struct ParsedSection: Identifiable {
+    let id = UUID()
+    /// The heading, tidied for use as a set title ("43~45번 (13)" → "43~45번").
+    /// Empty for rows that appeared before any heading.
+    var title: String
+    var rows: [ParsedRow]
+}
+
 /// How columns are separated in the pasted / imported text.
 enum Delimiter: String, CaseIterable, Identifiable {
     case auto = "자동 감지"
@@ -33,25 +46,43 @@ enum Delimiter: String, CaseIterable, Identifiable {
 /// - Plain lines split on a chosen or auto-detected delimiter
 enum WordParser {
 
+    /// Every word in the text, headings dropped.
     static func parse(_ raw: String, delimiter: Delimiter = .auto, swapColumns: Bool = false) -> [ParsedRow] {
+        sections(raw, delimiter: delimiter, swapColumns: swapColumns).flatMap(\.rows)
+    }
+
+    /// The same words, still grouped under the headings they were pasted with.
+    ///
+    /// Sections that end up empty are dropped, so a heading with nothing under it —
+    /// a page number, a stray line — never becomes a set.
+    static func sections(_ raw: String, delimiter: Delimiter = .auto,
+                         swapColumns: Bool = false) -> [ParsedSection] {
         let lines = raw
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
             .components(separatedBy: "\n")
 
-        var rows: [ParsedRow] = []
+        var sections: [ParsedSection] = []
+        var current = ParsedSection(title: "", rows: [])
+
         for rawLine in lines {
             let line = rawLine.trimmed
             guard !line.isEmpty else { continue }
             guard !isMarkdownSeparator(line) else { continue }
-            guard !isSectionHeader(line) else { continue }
+
+            if isSectionHeader(line) {
+                if !current.rows.isEmpty { sections.append(current) }
+                current = ParsedSection(title: sectionTitle(line), rows: [])
+                continue
+            }
 
             if var row = parseLine(line, delimiter: delimiter) {
                 if swapColumns { swap(&row.term, &row.meaning) }
-                if row.isUsable { rows.append(row) }
+                if row.isUsable { current.rows.append(row) }
             }
         }
-        return rows
+        if !current.rows.isEmpty { sections.append(current) }
+        return sections
     }
 
     // MARK: - Line parsing
@@ -279,6 +310,26 @@ enum WordParser {
         let s = stripBullet(line)
         guard s.range(of: sectionHeading, options: .regularExpression) != nil else { return false }
         return !s.contains { $0.isWordLetter }
+    }
+
+    /// A heading turned into a set title: numbering and decoration stripped, and the
+    /// trailing tally a mock-exam listing carries — `43~45번 (13)` — dropped, since 13
+    /// is how many words followed, not part of the name.
+    private static func sectionTitle(_ line: String) -> String {
+        var s = stripBullet(line)
+        if let range = s.range(of: #"\s*[\(（]\s*\d+\s*[\)）]\s*$"#, options: .regularExpression) {
+            s.removeSubrange(range)
+        }
+        // `[41~42]번` reads as a name once the wrapper is gone. Only the leading
+        // bracket and its closer go, so a qualifier like `3강 (심화)` survives.
+        if let open = s.range(of: #"^[\[\(（【<]\s*"#, options: .regularExpression) {
+            s.removeSubrange(open)
+            if let close = s.range(of: #"\s*[\]\)）】>]"#, options: .regularExpression) {
+                s.removeSubrange(close)
+            }
+        }
+        let cleaned = s.trimmingCharacters(in: separatorTrim)
+        return cleaned.isEmpty ? line.trimmed : cleaned
     }
 
     private static let sectionHeading =
