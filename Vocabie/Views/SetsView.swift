@@ -72,36 +72,39 @@ struct SetsView: View {
                 } else {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
-                            Button {
-                                Haptics.soft()
-                                showingNewNotebook = true
-                            } label: {
-                                Label("새 단어장", systemImage: "books.vertical")
-                            }
-                            Button {
-                                Haptics.soft()
-                                showingNewSet = true
-                            } label: {
-                                Label("새 세트", systemImage: "square.stack")
-                            }
-                            Button {
-                                Haptics.soft()
-                                showingImportSets = true
-                            } label: {
-                                Label("붙여넣기로 단어장 만들기", systemImage: "doc.on.clipboard")
-                            }
-                            if notebooks.count + looseSets.count > 1 {
-                                Divider()
+                            Section {
                                 Button {
                                     Haptics.soft()
-                                    withAnimation { editMode = .active }
+                                    showingNewNotebook = true
                                 } label: {
-                                    Label("순서 바꾸기", systemImage: "arrow.up.arrow.down")
+                                    Label("새 단어장", systemImage: "books.vertical")
+                                }
+                                Button {
+                                    Haptics.soft()
+                                    showingNewSet = true
+                                } label: {
+                                    Label("새 세트", systemImage: "square.stack")
+                                }
+                                Button {
+                                    Haptics.soft()
+                                    showingImportSets = true
+                                } label: {
+                                    Label("붙여넣기로 추가", systemImage: "doc.on.clipboard")
+                                }
+                            }
+                            if notebooks.count + looseSets.count > 1 {
+                                Section {
+                                    Button {
+                                        Haptics.soft()
+                                        withAnimation { editMode = .active }
+                                    } label: {
+                                        Label("순서 변경", systemImage: "arrow.up.arrow.down")
+                                    }
                                 }
                             }
                         } label: {
                             Image(systemName: "plus.circle.fill")
-                                .font(.title2)
+                                .font(.title3)
                                 .foregroundStyle(Theme.tint)
                         }
                     }
@@ -296,6 +299,9 @@ struct NotebookRow: View {
                 Text(notebook.title.isEmpty ? "제목 없는 단어장" : notebook.title)
                     .font(.headline)
                     .foregroundStyle(.primary)
+                // The 단어장 owns the language, so this is where it is announced —
+                // every set inside inherits it and needs no badge of its own.
+                LanguageBadge(language: notebook.language)
                 Spacer()
                 Text("세트 \(notebook.setCount)")
                     .font(.caption.weight(.medium))

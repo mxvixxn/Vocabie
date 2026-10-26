@@ -29,14 +29,22 @@ struct SetDetailView: View {
     // Round (묶음) study — the set is studied 10 cards at a time.
     private let roundSize = 10
     @State private var selectedRound = 0
-    // Resume flow for 리콜 / 스펠.
+    // Resume flow — offered for all three modes.
     @State private var showingResumeDialog = false
-    @State private var pendingMode: StudyMode?
+    @State private var pending: PendingStudy?
     @State private var resumeProgress: StudyProgress?
 
-    /// What the open study cover is working on. Normally this set's selected 묶음, but
-    /// "이어서" moves it on — to the next 묶음, or to the next 세트 on the same 단어장 —
-    /// without ever leaving the cover.
+    /// A launch waiting on the 이어서 / 처음부터 question.
+    private struct PendingStudy {
+        let mode: StudyMode
+        /// The 묶음 the learner left this mode on.
+        let round: Int
+        /// Progress saved part-way through that 묶음, if any.
+        let progress: StudyProgress?
+    }
+
+    /// What the open study cover is working on. Normally this set's selected 묶음, and
+    /// "이어서" moves it on to the next 묶음 of the same set without leaving the cover.
     @State private var target: StudyTarget?
     /// Bumped on every hand-off so SwiftUI builds a fresh study view (and a fresh
     /// session) instead of reusing the finished one.
@@ -71,42 +79,49 @@ struct SetDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button { showingImport = true } label: {
-                        Label("대량 추가 (붙여넣기·파일)", systemImage: "doc.badge.plus")
+                    // Grouped the way the learner thinks about the screen: put words in,
+                    // set how it behaves, take it out, then manage the set itself. The
+                    // wording is deliberately plain — every menu in the app says 추가 /
+                    // 변경 / 이동 / 보관 / 삭제 and nothing longer.
+                    Section {
+                        Button { showingAddOne = true } label: {
+                            Label("단어 추가", systemImage: "plus")
+                        }
+                        Button { showingImport = true } label: {
+                            Label("붙여넣기로 추가", systemImage: "doc.on.clipboard")
+                        }
                     }
-                    Button { showingAddOne = true } label: {
-                        Label("단어 하나 추가", systemImage: "plus")
+                    Section {
+                        Toggle(isOn: $autoSpeak) {
+                            Label("자동 발음", systemImage: "speaker.wave.2")
+                        }
+                        Button { showingWordOrder = true } label: {
+                            Label("순서 변경", systemImage: "arrow.up.arrow.down")
+                        }
+                        .disabled(set.wordCount < 2)
+                        Button { exportCSV() } label: {
+                            Label("CSV 내보내기", systemImage: "square.and.arrow.up")
+                        }
+                        .disabled(set.words.isEmpty)
                     }
-                    Divider()
-                    Toggle(isOn: $autoSpeak) {
-                        Label("카드 넘길 때 발음 듣기", systemImage: "speaker.wave.2")
-                    }
-                    Divider()
-                    Button { showingWordOrder = true } label: {
-                        Label("단어 순서 바꾸기", systemImage: "arrow.up.arrow.down")
-                    }
-                    .disabled(set.wordCount < 2)
-                    Divider()
-                    Button { exportCSV() } label: {
-                        Label("CSV로 내보내기", systemImage: "square.and.arrow.up")
-                    }
-                    .disabled(set.words.isEmpty)
-                    Divider()
-                    Button {
-                        draftTitle = set.title
-                        showingRename = true
-                    } label: {
-                        Label("이름 변경", systemImage: "pencil")
-                    }
-                    Button { showingMove = true } label: {
-                        Label(set.notebook == nil ? "단어장에 넣기" : "단어장 이동",
-                              systemImage: "folder")
-                    }
-                    Button(role: .destructive) { confirmingDelete = true } label: {
-                        Label("세트 삭제", systemImage: "trash")
+                    Section {
+                        Button {
+                            draftTitle = set.title
+                            showingRename = true
+                        } label: {
+                            Label("이름 변경", systemImage: "pencil")
+                        }
+                        Button { showingMove = true } label: {
+                            Label("단어장 이동", systemImage: "folder")
+                        }
+                        Button(role: .destructive) { confirmingDelete = true } label: {
+                            Label("삭제", systemImage: "trash")
+                        }
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle.fill").font(.title3)
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(Theme.tint)
                 }
             }
         }
@@ -156,18 +171,28 @@ struct SetDetailView: View {
         // view and its tail ended up pointing at the 암기 card no matter which mode
         // was tapped. A centred alert belongs to nothing, so it can't mislead.
         .alert("이어서 학습할까요?", isPresented: $showingResumeDialog) {
-            Button("이어서 (\(resumeProgress?.clearedIDs.count ?? 0)/\(resumeProgress?.total ?? 0))") {
-                activeMode = pendingMode
+            if let pending {
+                Button(resumeButtonTitle(pending)) {
+                    start(pending.mode, round: pending.round, progress: pending.progress)
+                }
+                Button(alternativeTitle(pending), role: .destructive) {
+                    // The alternative is always "the 묶음 the screen is showing, from the
+                    // top". When that is the same 묶음 being offered, this reads as
+                    // 처음부터; when the learner has picked a different one, it has to
+                    // take them there — offering to restart a 묶음 they didn't choose
+                    // would leave the picked one unreachable.
+                    StudyProgressStore.clear(progressKey(pending.mode,
+                                                         StudyTarget(set: set, round: currentRound)))
+                    start(pending.mode, round: currentRound, progress: nil)
+                }
             }
-            Button("처음부터", role: .destructive) {
-                if let mode = pendingMode { StudyProgressStore.clear(progressKey(mode)) }
-                resumeProgress = nil
-                activeMode = pendingMode
-            }
-            Button("취소", role: .cancel) { pendingMode = nil; resumeProgress = nil }
+            Button("취소", role: .cancel) { pending = nil; resumeProgress = nil }
         } message: {
-            // Name the mode — the learner needs to know *this* is the 스펠 they tapped.
-            Text("‘\(pendingMode?.korean ?? "")’ \(scopeLabel)에 저장된 진행이 있어요.")
+            // Name the mode and the 묶음 — the learner needs to know *this* is the
+            // 스펠 they tapped, and where it would drop them.
+            if let pending {
+                Text("‘\(pending.mode.korean)’ \(roundLabel(pending.round))에서 멈췄어요.")
+            }
         }
         .onAppear(perform: syncSelectedRound)
     }
@@ -176,11 +201,14 @@ struct SetDetailView: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            Text("\(set.wordCount)단어 · \(Int(set.masteryProgress * 100))% 완료")
+            // Progress is per direction: 영단어 → 뜻 and 뜻 → 영단어 are separate skills
+            // and now carry separate stars, so the bar follows the picker below it.
+            Text("\(set.wordCount)단어 · \(direction.label(for: set.language)) \(Int(set.masteryProgress(for: direction) * 100))% 완료")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
-            ProgressView(value: set.masteryProgress)
+            ProgressView(value: set.masteryProgress(for: direction))
                 .tint(Theme.tint)
+                .animation(.easeInOut(duration: 0.25), value: direction)
         }
         .padding(16)
         .glassPanel()
@@ -190,7 +218,7 @@ struct SetDetailView: View {
     private var directionPicker: some View {
         Picker("방향", selection: $direction) {
             ForEach(StudyDirection.allCases) { d in
-                Text(d.label).tag(d)
+                Text(d.label(for: set.language)).tag(d)
             }
         }
         .pickerStyle(.segmented)
@@ -198,7 +226,10 @@ struct SetDetailView: View {
 
     private var modeCards: some View {
         VStack(spacing: 12) {
-            ForEach(StudyMode.allCases) { mode in
+            // 스펠 is missing for a script with no spelling to type — see
+            // `VocabSet.availableModes`. A one-line note stands in for it so the
+            // absence reads as deliberate rather than as a bug.
+            ForEach(set.availableModes) { mode in
                 Button {
                     Haptics.soft()
                     launch(mode)
@@ -206,6 +237,13 @@ struct SetDetailView: View {
                     ModeCard(mode: mode)
                 }
                 .buttonStyle(.plain)
+            }
+            if !set.language.supportsSpell {
+                Text(set.language.spellUnavailableReason)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
             }
         }
     }
@@ -256,11 +294,13 @@ struct SetDetailView: View {
     /// A round is "done" once every card in it is fully mastered (3 stars).
     private func roundMastered(_ i: Int) -> Bool {
         guard rounds.indices.contains(i) else { return false }
-        return rounds[i].allSatisfy { $0.starRating >= 3 }
+        return rounds[i].allSatisfy { $0.starRating(for: direction) >= 3 }
     }
 
     private var firstUnfinishedRound: Int {
-        rounds.firstIndex { round in !round.allSatisfy { $0.starRating >= 3 } } ?? 0
+        rounds.firstIndex { round in
+            !round.allSatisfy { $0.starRating(for: direction) >= 3 }
+        } ?? 0
     }
 
     /// Land on the first unfinished round, unless the learner is mid-way through one —
@@ -288,31 +328,25 @@ struct SetDetailView: View {
         return chunks.indices.contains(target.round) ? chunks[target.round] : []
     }
 
-    /// What follows this chunk: the next 묶음 of the same set, or failing that the next
-    /// set on the same 단어장, in the order the list shows them. `nil` at the end of the
-    /// shelf, and for a set that isn't on one — there is nothing to name in that case.
+    /// What follows this chunk: the next 묶음 of the *same* set, and nothing else.
+    ///
+    /// Sets are independent. Rolling on into the next 세트 on the shelf meant finishing
+    /// 21–25 and landing in 18–20 — material the learner never asked for, in an order
+    /// that reads as random. The last 묶음 of a set is the end of the session; the
+    /// finish screen offers 한 번 더 and 끝내기 there.
     private func nextTarget(after target: StudyTarget) -> StudyTarget? {
-        // Studying 전체 already covered the set, so the only thing left is the next one.
-        if target.round != Self.wholeSet,
-           rounds(of: target.set).indices.contains(target.round + 1) {
-            return StudyTarget(set: target.set, round: target.round + 1)
-        }
-        guard let notebook = target.set.notebook else { return nil }
-        let siblings = notebook.orderedSets.filter { $0.isActive && !$0.words.isEmpty }
-        guard let i = siblings.firstIndex(where: { $0.id == target.set.id }),
-              siblings.indices.contains(i + 1) else { return nil }
-        return StudyTarget(set: siblings[i + 1], round: 0)
+        // Studying 전체 already covered the set, so nothing follows it.
+        guard target.round != Self.wholeSet,
+              rounds(of: target.set).indices.contains(target.round + 1) else { return nil }
+        return StudyTarget(set: target.set, round: target.round + 1)
     }
 
     private func label(for target: StudyTarget) -> String {
         let chunks = rounds(of: target.set)
-        let hasMany = chunks.count > 1
-        if target.set.id == set.id {
-            guard target.round != Self.wholeSet else { return "\(target.set.title) 전체" }
-            return hasMany ? "묶음 \(target.round + 1) · \(rangeLabel(chunks, target.round))"
-                           : target.set.title
-        }
-        return hasMany ? "\(target.set.title) 묶음 1" : target.set.title
+        guard target.round != Self.wholeSet else { return "\(target.set.title) 전체" }
+        return chunks.count > 1
+            ? "묶음 \(target.round + 1) · \(rangeLabel(chunks, target.round))"
+            : target.set.title
     }
 
     /// Hand the open cover over to the next chunk. Any progress already saved for it is
@@ -320,15 +354,11 @@ struct SetDetailView: View {
     /// the learner was half way through.
     private func advance(_ mode: StudyMode, to next: StudyTarget) {
         Haptics.soft()
-        if mode != .memorize,
-           let saved = StudyProgressStore.load(progressKey(mode, next)),
-           saved.total > 0, saved.clearedIDs.count < saved.total {
-            resumeProgress = saved
-        } else {
-            resumeProgress = nil
-        }
+        resumeProgress = StudyProgressStore.load(progressKey(mode, next))
+            .flatMap { $0.total > 0 && $0.clearedIDs.count < $0.total ? $0 : nil }
         if next.set.id == set.id { selectedRound = next.round }
         target = next
+        StudyPlaceStore.save(round: next.round, mode: mode, setID: next.set.id)
         studySeq += 1
     }
 
@@ -398,19 +428,63 @@ struct SetDetailView: View {
         .buttonStyle(.plain)
     }
 
-    /// Launch a mode. 리콜 / 스펠 first offer to resume any saved progress.
+    /// Launch a mode.
+    ///
+    /// Two things can make this a question rather than a jump: progress saved part-way
+    /// through a 묶음, and a 묶음 the learner walked away from last time — 끝내기 on
+    /// 묶음 5 should be waiting for them on the way back in, whichever mode they tap.
     private func launch(_ mode: StudyMode) {
-        resumeProgress = nil
-        target = currentTarget
-        if mode != .memorize,
-           let saved = StudyProgressStore.load(progressKey(mode)),
-           saved.total > 0, saved.clearedIDs.count < saved.total {
-            pendingMode = mode
-            resumeProgress = saved
+        let saved = StudyPlaceStore.load(mode: mode, setID: set.id).flatMap(validRound)
+        let round = saved ?? currentRound
+        let progress = inProgress(mode, round: round)
+
+        if progress != nil || (round != currentRound && !roundMastered(round)) {
+            pending = PendingStudy(mode: mode, round: round, progress: progress)
             showingResumeDialog = true
         } else {
-            activeMode = mode
+            start(mode, round: currentRound, progress: nil)
         }
+    }
+
+    /// Open a mode on a specific 묶음, and remember it as this mode's place.
+    private func start(_ mode: StudyMode, round: Int, progress: StudyProgress?) {
+        pending = nil
+        selectedRound = round
+        resumeProgress = progress
+        target = StudyTarget(set: set, round: round)
+        StudyPlaceStore.save(round: round, mode: mode, setID: set.id)
+        activeMode = mode
+    }
+
+    /// Saved progress for a round, but only while it is worth offering — a round that
+    /// was finished has nothing left to resume.
+    private func inProgress(_ mode: StudyMode, round: Int) -> StudyProgress? {
+        let saved = StudyProgressStore.load(progressKey(mode, StudyTarget(set: set, round: round)))
+        guard let saved, saved.total > 0, saved.clearedIDs.count < saved.total else { return nil }
+        return saved
+    }
+
+    /// A stored round index, if it still points at something in this set.
+    private func validRound(_ round: Int) -> Int? {
+        if round == Self.wholeSet { return hasRounds ? round : nil }
+        return rounds.indices.contains(round) ? round : nil
+    }
+
+    private func roundLabel(_ round: Int) -> String {
+        guard round != Self.wholeSet else { return "전체" }
+        guard hasRounds else { return "전체" }
+        return "묶음 \(round + 1) · \(roundRangeLabel(round))"
+    }
+
+    private func resumeButtonTitle(_ pending: PendingStudy) -> String {
+        guard let p = pending.progress else { return "\(roundLabel(pending.round))부터" }
+        return "이어서 (\(p.clearedIDs.count)/\(p.total))"
+    }
+
+    /// The other way out of the question — never just "처음부터" when what it actually
+    /// starts is a different 묶음 from the one being offered.
+    private func alternativeTitle(_ pending: PendingStudy) -> String {
+        pending.round == currentRound ? "처음부터" : "\(roundLabel(currentRound))부터"
     }
 
     private var wordListSection: some View {
@@ -444,7 +518,7 @@ struct SetDetailView: View {
                     Button {
                         editingWord = word
                     } label: {
-                        WordRow(word: word)
+                        WordRow(word: word, direction: direction)
                     }
                     .buttonStyle(.plain)
                 }
@@ -517,9 +591,9 @@ struct SetDetailView: View {
         EmptyStateView(
             systemImage: "tray",
             title: "단어가 아직 없어요",
-            message: "우측 상단 ＋ 에서 붙여넣기나 파일로\n단어를 한 번에 추가해 보세요.",
-            actionTitle: "대량 추가",
-            actionImage: "doc.badge.plus"
+            message: "붙여넣기나 파일로 단어를\n한 번에 추가해 보세요.",
+            actionTitle: "붙여넣기로 추가",
+            actionImage: "doc.on.clipboard"
         ) {
             showingImport = true
         }
@@ -556,6 +630,10 @@ struct SetDetailView: View {
         Haptics.intenseError()
         dismiss()
 
+        // The words go with the set; so should everything remembered about studying it.
+        StudyProgressStore.clearAll(setID: set.id)
+        StudyPlaceStore.clearAll(setID: set.id)
+
         let doomed = set
         Task {
             try? await Task.sleep(nanoseconds: 350_000_000)
@@ -575,6 +653,9 @@ struct SetDetailView: View {
         switch mode {
         case .memorize:
             MemorizeView(cards: cards, direction: direction,
+                         voice: set.language.voiceCode,
+                         progressKey: progressKey(.memorize, target),
+                         resume: resumeProgress,
                          nextTitle: nextTitle, onNext: onNext)
         case .recall:
             RecallView(
@@ -627,6 +708,8 @@ private struct ModeCard: View {
 
 private struct WordRow: View {
     let word: Vocab
+    /// Stars are earned per direction, so the row shows the one being studied.
+    let direction: StudyDirection
 
     var body: some View {
         HStack {
@@ -637,7 +720,7 @@ private struct WordRow: View {
             Spacer()
             Button {
                 Haptics.soft()
-                Speaker.shared.speak(word.term)
+                Speaker.shared.speak(word.term, language: word.voiceCode)
             } label: {
                 Image(systemName: "speaker.wave.2")
                     .font(.footnote)
@@ -648,10 +731,11 @@ private struct WordRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel("\(word.term) 발음 듣기")
             HStack(spacing: 2) {
+                let stars = word.starRating(for: direction)
                 ForEach(0..<3, id: \.self) { i in
-                    Image(systemName: i < word.starRating ? "star.fill" : "star")
+                    Image(systemName: i < stars ? "star.fill" : "star")
                         .font(.caption2)
-                        .foregroundStyle(i < word.starRating ? Theme.star : Color.secondary.opacity(0.35))
+                        .foregroundStyle(i < stars ? Theme.star : Color.secondary.opacity(0.35))
                 }
             }
         }

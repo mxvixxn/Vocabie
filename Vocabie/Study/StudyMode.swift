@@ -56,10 +56,14 @@ enum StudyDirection: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var label: String {
+    /// The English-deck wording, kept for callers with no set in hand.
+    var label: String { label(for: .english) }
+
+    /// Named for the language being studied — `중국어 → 뜻`, `뜻 → 일본어`.
+    func label(for language: StudyLanguage) -> String {
         switch self {
-        case .termToMeaning: "영단어 → 뜻"
-        case .meaningToTerm: "뜻 → 영단어"
+        case .termToMeaning: "\(language.termLabel) → 뜻"
+        case .meaningToTerm: "뜻 → \(language.termLabel)"
         }
     }
 }

@@ -78,7 +78,7 @@ struct ImportWordsView: View {
         Section {
             ZStack(alignment: .topLeading) {
                 if rawText.isEmpty {
-                    Text("여기에 붙여넣기\n\napple\t사과\nbanana\t바나나\n\n또는  apple, 사과  /  apple - 사과")
+                    Text(set.language.pasteSample)
                         .font(.callout)
                         .foregroundStyle(.tertiary)
                         .padding(.top, 8)

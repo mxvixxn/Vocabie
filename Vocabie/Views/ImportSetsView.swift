@@ -19,6 +19,9 @@ struct ImportSetsView: View {
     @State private var rawText = ""
     @State private var notebookTitle = ""
     @State private var delimiter: Delimiter = .auto
+    /// Only used when this paste creates the 단어장. Pasting into an existing one
+    /// inherits its language — a shelf is one body of material.
+    @State private var newNotebookLanguage: StudyLanguage = .english
     @State private var swapColumns = false
     @State private var showingFileImporter = false
     @State private var importError: String?
@@ -48,7 +51,10 @@ struct ImportSetsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                if notebook == nil { notebookSection }
+                if notebook == nil {
+                    notebookSection
+                    languageSection
+                }
                 inputSection
                 optionsSection
                 previewSection
@@ -101,7 +107,7 @@ struct ImportSetsView: View {
         Section {
             ZStack(alignment: .topLeading) {
                 if rawText.isEmpty {
-                    Text("회차 전체를 그대로 붙여넣기\n\n18~23번 (24)\n1. struggle — 노력\n…\n\n24-30번 (18)\n1. inhibit — 방해하다")
+                    Text(language.sectionsSample)
                         .font(.callout)
                         .foregroundStyle(.tertiary)
                         .padding(.top, 8)
@@ -128,6 +134,22 @@ struct ImportSetsView: View {
             Text("붙여넣기 또는 파일")
         } footer: {
             Text("‘43~45번’, ‘3강’처럼 번호나 강으로 된 줄을 만나면 거기서 세트를 나눠요. 그런 줄이 없으면 세트 하나로 들어갑니다.")
+        }
+    }
+
+    /// The language these sets will be studied in: the shelf's, or the one being
+    /// chosen for the shelf this paste is about to create.
+    private var language: StudyLanguage { notebook?.language ?? newNotebookLanguage }
+
+    @ViewBuilder
+    private var languageSection: some View {
+        Section("언어") {
+            Picker("언어", selection: $newNotebookLanguage) {
+                ForEach(StudyLanguage.allCases) { lang in
+                    Text(lang.label).tag(lang)
+                }
+            }
+            .pickerStyle(.segmented)
         }
     }
 
@@ -221,7 +243,7 @@ struct ImportSetsView: View {
         if let notebook {
             shelf = notebook
         } else {
-            let made = Notebook(title: notebookTitle.trimmed)
+            let made = Notebook(title: notebookTitle.trimmed, language: newNotebookLanguage)
             context.insert(made)
             shelf = made
         }

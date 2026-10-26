@@ -54,7 +54,7 @@ struct ReviewStartView: View {
                     )
                 case .spell:
                     SpellView(
-                        session: StudySession(cards: dueCards, mode: .spell,
+                        session: StudySession(cards: spellableCards, mode: .spell,
                                               direction: direction, shuffle: true),
                         progressKey: "review|spell"
                     )
@@ -92,10 +92,21 @@ struct ReviewStartView: View {
         .pickerStyle(.segmented)
     }
 
-    /// Only retrieval modes are offered — 암기 doesn't grade, so it can't advance a schedule.
+    /// Cards today's review can be typed back, i.e. the ones from 영어 sets.
+    /// A mixed review would otherwise ask for 한자 on the keyboard.
+    private var spellableCards: [Vocab] {
+        dueCards.filter { $0.voiceSupportsSpell }
+    }
+
+    /// Only retrieval modes are offered — 암기 doesn't grade, so it can't advance a
+    /// schedule — and 스펠 drops out when nothing due today can be spelled.
+    private var offeredModes: [StudyMode] {
+        spellableCards.isEmpty ? [.recall] : [.recall, .spell]
+    }
+
     private var modeButtons: some View {
         VStack(spacing: 12) {
-            ForEach([StudyMode.recall, .spell]) { mode in
+            ForEach(offeredModes) { mode in
                 Button {
                     Haptics.soft()
                     activeMode = mode

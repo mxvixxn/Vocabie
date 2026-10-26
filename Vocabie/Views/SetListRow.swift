@@ -220,3 +220,23 @@ private struct SetActionDialogs: ViewModifier {
         Haptics.intenseError()
     }
 }
+
+// MARK: - Language badge
+
+/// The 단어장's language, as a quiet capsule beside its title.
+///
+/// Shown on every 단어장, 영어 included: a missing badge would be one more thing to
+/// interpret, and the row already carries stars, 복습 and progress in colour — this
+/// one stays grey so it reads as a label rather than as a state.
+struct LanguageBadge: View {
+    let language: StudyLanguage
+
+    var body: some View {
+        Text(language.badge)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(.secondary.opacity(0.12)))
+    }
+}

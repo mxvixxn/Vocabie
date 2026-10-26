@@ -25,6 +25,12 @@ struct SpellView: View {
 
     @AppStorage("autoSpeak") private var autoSpeak = true
 
+    /// Which already-answered card the look-back is showing; `nil` while closed.
+    @State private var peekIndex: Int?
+    /// True while this screen holds the audio session, so hold / release stay balanced
+    /// however many times SwiftUI decides to call `onAppear`.
+    @State private var holding = false
+
     private enum Phase { case typing, correct, missed }
 
     /// True while the keyboard is claiming the bottom of the screen.
@@ -41,7 +47,8 @@ struct SpellView: View {
             } else {
                 StudyScaffold(
                     mode: .spell,
-                    cleared: session.clearedCount,
+                    // Counts the card on screen, so the pill runs 1/10 … 10/10.
+                    cleared: min(session.clearedCount + 1, session.total),
                     total: session.total,
                     progress: session.progress,
                     compactPill: tight,
@@ -75,10 +82,27 @@ struct SpellView: View {
                         controls
                     }
                 }
+                // Swipe left anywhere on the stage to look back at what just went by.
+                .backSwipe(enabled: !session.history.isEmpty) { openPeek() }
             }
+
+            HistoryPeek(cards: session.history, index: $peekIndex, accent: Theme.spell)
         }
-        .onAppear { fieldFocused = true }
-        .onDisappear { Speaker.shared.stop() }
+        .onAppear {
+            fieldFocused = true
+            takeAudio()
+        }
+        .onChange(of: peekIndex) { _, now in
+            guard now == nil else { return }
+            // Back to the question: the keyboard returns only if there is still
+            // something to type, and a held auto-advance picks up where it left off.
+            if phase == .typing { fieldFocused = true }
+            if phase == .correct { autoProceed() }
+        }
+        .onDisappear {
+            Speaker.shared.stop()
+            releaseAudio()
+        }
     }
 
     // MARK: Stage
@@ -157,14 +181,9 @@ struct SpellView: View {
 
         reveal()
 
-        if ok {
-            // A hit moves on by itself; a miss waits for 다음, so the learner decides
-            // how long to sit with the word they just got wrong.
-            Task {
-                try? await Task.sleep(nanoseconds: 2_200_000_000)
-                if phase == .correct { proceed() }
-            }
-        }
+        // A hit moves on by itself; a miss waits for 다음, so the learner decides
+        // how long to sit with the word they just got wrong.
+        if ok { autoProceed() }
     }
 
     private func hint() {
@@ -214,6 +233,37 @@ struct SpellView: View {
         phase = .typing
         usedHint = false
         fieldFocused = true
+    }
+
+    /// Move on by itself after a hit. Held while the look-back is open, so closing it
+    /// returns the learner to the card they answered rather than the one after it.
+    private func autoProceed() {
+        Task {
+            try? await Task.sleep(nanoseconds: 2_200_000_000)
+            guard phase == .correct, peekIndex == nil else { return }
+            proceed()
+        }
+    }
+
+    /// Open the look-back on the most recent card. The keyboard steps aside so the
+    /// card has the screen, and comes back when the look-back closes.
+    private func openPeek() {
+        guard !session.history.isEmpty else { return }
+        fieldFocused = false
+        withAnimation(.easeInOut(duration: 0.2)) { peekIndex = session.history.count - 1 }
+    }
+
+    /// Hold the audio session for as long as this screen is up — see `Speaker.hold()`.
+    private func takeAudio() {
+        guard !holding else { return }
+        holding = true
+        Speaker.shared.hold()
+    }
+
+    private func releaseAudio() {
+        guard holding else { return }
+        holding = false
+        Speaker.shared.release()
     }
 
     private func close() { dismiss() }

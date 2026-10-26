@@ -39,6 +39,16 @@ final class VocabSet {
 }
 
 extension VocabSet {
+    /// Inherited from the 단어장 this set sits on. A set with no shelf is 영어 —
+    /// the unfiled pile has nothing to inherit from.
+    var language: StudyLanguage { notebook?.language ?? .english }
+
+    /// The modes this set can actually be studied in — 스펠 drops out for a script
+    /// that has no spelling to type. See `StudyLanguage.supportsSpell`.
+    var availableModes: [StudyMode] {
+        StudyMode.allCases.filter { $0 != .spell || language.supportsSpell }
+    }
+
     /// The order the library lists sets in. Sets that have never been dragged all share
     /// `order == 0`, so they keep falling back to newest-first — the arrangement only
     /// takes over once there is one.
@@ -61,7 +71,7 @@ extension VocabSet {
     var wordCount: Int { words.count }
 
     /// 0.0 ... 1.0 — how much of the set's study is done, counted in stars earned
-    /// out of the stars on offer (3 per card: 암기 · 리콜 · 스펠).
+    /// out of the stars on offer (6 per card: 암기 · 리콜 · 스펠, in each direction).
     ///
     /// Not "share of fully mastered cards". That older reading stayed at 0% until a
     /// card had been through all three modes, so finishing 리콜 across a whole set
@@ -69,10 +79,21 @@ extension VocabSet {
     /// show up; clearing one of the three now reads as a third of the way.
     var masteryProgress: Double {
         guard !words.isEmpty else { return 0 }
-        return Double(totalStars) / Double(words.count * 3)
+        return Double(totalStars) / Double(words.count * 6)
     }
 
-    /// Total stars earned across all cards (used for the set summary).
+    /// Progress in one direction only — what the set screen shows, since the learner
+    /// is always looking at one direction at a time there.
+    func masteryProgress(for direction: StudyDirection) -> Double {
+        guard !words.isEmpty else { return 0 }
+        return Double(totalStars(for: direction)) / Double(words.count * 3)
+    }
+
+    func totalStars(for direction: StudyDirection) -> Int {
+        words.reduce(0) { $0 + $1.starRating(for: direction) }
+    }
+
+    /// Total stars earned across all cards, both directions (used for the set summary).
     var totalStars: Int {
         words.reduce(0) { $0 + $1.starRating }
     }

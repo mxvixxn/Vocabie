@@ -28,6 +28,12 @@ struct RecallView: View {
 
     @AppStorage("autoSpeak") private var autoSpeak = true
 
+    /// Which already-answered card the look-back is showing; `nil` while closed.
+    @State private var peekIndex: Int?
+    /// True while this screen holds the audio session, so hold / release stay balanced
+    /// however many times SwiftUI decides to call `onAppear`.
+    @State private var holding = false
+
     var body: some View {
         ZStack {
             Theme.background(scheme).ignoresSafeArea()
@@ -39,7 +45,9 @@ struct RecallView: View {
             } else {
                 StudyScaffold(
                     mode: .recall,
-                    cleared: session.clearedCount,
+                    // The card on screen is the one being counted, so the pill opens
+                    // at 1/10 rather than 0/10 — the last word then reads 10/10.
+                    cleared: min(session.clearedCount + 1, session.total),
                     total: session.total,
                     progress: session.progress,
                     onClose: close
@@ -51,7 +59,8 @@ struct RecallView: View {
                             term: session.current?.term ?? "",
                             meaning: session.current?.meaning ?? "",
                             note: session.promptNote,
-                            accent: Theme.recall
+                            accent: Theme.recall,
+                            voice: session.current?.voiceCode ?? StudyLanguage.english.voiceCode
                         )
                     } else {
                         WordStage(
@@ -73,9 +82,21 @@ struct RecallView: View {
                         }
                     }
                 }
+                // Swipe left anywhere on the card to look back at what just went by.
+                .backSwipe(enabled: !session.history.isEmpty) { openPeek() }
             }
+
+            HistoryPeek(cards: session.history, index: $peekIndex, accent: Theme.recall)
         }
-        .onDisappear { Speaker.shared.stop() }
+        .onAppear { takeAudio() }
+        .onChange(of: peekIndex) { _, now in
+            // Back to the question — pick the held auto-advance back up.
+            if now == nil, selected != nil, wasCorrect { autoProceed() }
+        }
+        .onDisappear {
+            Speaker.shared.stop()
+            releaseAudio()
+        }
     }
 
     /// The four choices, answered on lift rather than on touch.
@@ -168,16 +189,12 @@ struct RecallView: View {
         withAnimation(.easeInOut(duration: 0.22)) { selected = option }
         // 따닥 on a hit, 따다닥 (FaceID-fail) on a miss.
         isCorrect ? Haptics.success() : Haptics.intenseError()
-        if autoSpeak, let term = session.current?.term {
-            Speaker.shared.speak(term)
+        if autoSpeak, let card = session.current {
+            Speaker.shared.speak(card.term, language: card.voiceCode)
         }
 
         guard isCorrect else { return }   // a miss waits for 다음
-        // Long enough for the utterance to land before the next card.
-        Task {
-            try? await Task.sleep(nanoseconds: 1_600_000_000)
-            if selected != nil { proceed() }
-        }
+        autoProceed()
     }
 
     private func proceed() {
@@ -203,6 +220,38 @@ struct RecallView: View {
         session = StudySession(cards: session.snapshotCards, mode: .recall,
                                direction: session.direction, shuffle: session.shuffle)
         selected = nil
+    }
+
+    /// Move on by itself after a hit — long enough for the utterance to land first.
+    ///
+    /// Held while the look-back is open: the learner asked to see the previous word, and
+    /// advancing the question behind the overlay would drop them somewhere else when
+    /// they close it. Closing re-arms the timer.
+    private func autoProceed() {
+        Task {
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            guard selected != nil, peekIndex == nil else { return }
+            proceed()
+        }
+    }
+
+    /// Open the look-back on the most recent card.
+    private func openPeek() {
+        guard !session.history.isEmpty else { return }
+        withAnimation(.easeInOut(duration: 0.2)) { peekIndex = session.history.count - 1 }
+    }
+
+    /// Hold the audio session for as long as this screen is up — see `Speaker.hold()`.
+    private func takeAudio() {
+        guard !holding else { return }
+        holding = true
+        Speaker.shared.hold()
+    }
+
+    private func releaseAudio() {
+        guard holding else { return }
+        holding = false
+        Speaker.shared.release()
     }
 
     private func close() { dismiss() }

@@ -46,41 +46,46 @@ struct NotebookDetailView: View {
             } else {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button {
-                        Haptics.soft()
-                        showingNewSet = true
-                    } label: {
-                        Label("이 단어장에 세트 추가", systemImage: "plus")
-                    }
-                    Button {
-                        Haptics.soft()
-                        showingImportSets = true
-                    } label: {
-                        Label("붙여넣기로 세트 여러 개", systemImage: "doc.on.clipboard")
-                    }
-                    if sets.count > 1 {
+                    Section {
                         Button {
                             Haptics.soft()
-                            withAnimation { editMode = .active }
+                            showingNewSet = true
                         } label: {
-                            Label("세트 순서 바꾸기", systemImage: "arrow.up.arrow.down")
+                            Label("세트 추가", systemImage: "square.stack")
+                        }
+                        Button {
+                            Haptics.soft()
+                            showingImportSets = true
+                        } label: {
+                            Label("붙여넣기로 추가", systemImage: "doc.on.clipboard")
+                        }
+                        if sets.count > 1 {
+                            Button {
+                                Haptics.soft()
+                                withAnimation { editMode = .active }
+                            } label: {
+                                Label("순서 변경", systemImage: "arrow.up.arrow.down")
+                            }
                         }
                     }
-                    Divider()
-                    Button {
-                        draftTitle = notebook.title
-                        showingRename = true
-                    } label: {
-                        Label("이름 변경", systemImage: "pencil")
-                    }
-                    Button { archive() } label: {
-                        Label("보관", systemImage: "archivebox")
-                    }
-                    Button(role: .destructive) { confirmingDelete = true } label: {
-                        Label("단어장 삭제", systemImage: "trash")
+                    Section {
+                        Button {
+                            draftTitle = notebook.title
+                            showingRename = true
+                        } label: {
+                            Label("이름 변경", systemImage: "pencil")
+                        }
+                        Button { archive() } label: {
+                            Label("보관", systemImage: "archivebox")
+                        }
+                        Button(role: .destructive) { confirmingDelete = true } label: {
+                            Label("삭제", systemImage: "trash")
+                        }
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle.fill").font(.title3)
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(Theme.tint)
                 }
             }
             }

@@ -25,20 +25,32 @@ final class Notebook {
     /// what was there. See `VocabSet.isActive`.
     var isArchived: Bool = false
 
+    /// The language every set on this shelf teaches, stored raw so SwiftData can
+    /// default it. A 단어장 is one body of material — one textbook, one exam — so the
+    /// language belongs here rather than on each 세트, and a set can never disagree
+    /// with the shelf it sits on. 단어장 made before languages existed are 영어.
+    var languageRaw: String = StudyLanguage.english.rawValue
+
     /// Sets on this shelf. Deleting the 단어장 deletes them, and their words with them.
     @Relationship(deleteRule: .cascade, inverse: \VocabSet.notebook)
     var sets: [VocabSet] = []
 
-    init(title: String, detail: String = "") {
+    init(title: String, detail: String = "", language: StudyLanguage = .english) {
         self.id = UUID()
         self.title = title
         self.detail = detail
+        self.languageRaw = language.rawValue
         self.createdAt = Date()
         self.updatedAt = Date()
     }
 }
 
 extension Notebook {
+    var language: StudyLanguage {
+        get { StudyLanguage(rawValue: languageRaw) ?? .english }
+        set { languageRaw = newValue.rawValue }
+    }
+
     /// Same rule as `VocabSet.inListOrder`, for the 단어장 list.
     static func inListOrder(_ a: Notebook, _ b: Notebook) -> Bool {
         a.order == b.order ? a.updatedAt > b.updatedAt : a.order < b.order
@@ -65,7 +77,7 @@ extension Notebook {
     var masteryProgress: Double {
         let count = wordCount
         guard count > 0 else { return 0 }
-        return Double(totalStars) / Double(count * 3)
+        return Double(totalStars) / Double(count * 6)
     }
 
     func dueCount(asOf now: Date = Date()) -> Int {

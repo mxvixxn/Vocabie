@@ -18,6 +18,9 @@ final class Speaker: NSObject {
 
     private let synthesizer = AVSpeechSynthesizer()
     private var categoryConfigured = false
+    /// How many study screens are currently holding the audio session open.
+    private var holds = 0
+    private var sessionActive = false
 
     /// True while an utterance is playing — views use it to animate the speaker icon.
     private(set) var isSpeaking = false
@@ -50,10 +53,29 @@ final class Speaker: NSObject {
         synthesizer.speak(utterance)
     }
 
+    // MARK: Session holds
+    //
+    // Activating an `AVAudioSession` is not free — it is a cross-process call, and doing
+    // it per word meant every card flip paid for one on the main thread. A study screen
+    // holds the session open for as long as it is on screen instead, so the utterances
+    // in between cost nothing but the speaking.
+
+    /// Keep the audio session live for the duration of a study screen.
+    func hold() {
+        holds += 1
+        activateSession()
+    }
+
+    /// Give the session back. Music ducked for studying returns to full volume.
+    func release() {
+        holds = max(0, holds - 1)
+        if holds == 0 && !synthesizer.isSpeaking { deactivateSession() }
+    }
+
     func stop() {
         synthesizer.stopSpeaking(at: .immediate)
         isSpeaking = false
-        deactivateSession()
+        if holds == 0 { deactivateSession() }
     }
 
     // MARK: Audio session
@@ -67,7 +89,9 @@ final class Speaker: NSObject {
                 try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
                 categoryConfigured = true
             }
+            guard !sessionActive else { return }
             try session.setActive(true)
+            sessionActive = true
         } catch {
             // Audio is a nice-to-have; never let it break studying.
             #if DEBUG
@@ -78,6 +102,8 @@ final class Speaker: NSObject {
 
     /// Releasing the session lets ducked music return to full volume.
     private func deactivateSession() {
+        guard sessionActive else { return }
+        sessionActive = false
         do {
             try AVAudioSession.sharedInstance()
                 .setActive(false, options: [.notifyOthersOnDeactivation])
@@ -125,7 +151,8 @@ extension Speaker: AVSpeechSynthesizerDelegate {
                                        didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor in
             self.isSpeaking = false
-            self.deactivateSession()
+            // A study screen still on screen keeps its hold — see `hold()`.
+            if self.holds == 0 { self.deactivateSession() }
         }
     }
 

@@ -10,6 +10,10 @@ struct NewSetView: View {
     /// list rather than from inside a 단어장 — it goes to 미분류 then.
     var notebook: Notebook? = nil
 
+    /// Inherited from the shelf — a set never picks its own language. Unfiled sets
+    /// are 영어; see `VocabSet.language`.
+    private var language: StudyLanguage { notebook?.language ?? .english }
+
     @State private var title = ""
     @State private var detail = ""
 
@@ -17,7 +21,7 @@ struct NewSetView: View {
         NavigationStack {
             Form {
                 Section("세트 정보") {
-                    TextField("제목 (예: 1번-10번)", text: $title)
+                    TextField(language.placeholderExample, text: $title)
                     TextField("메모 (선택)", text: $detail)
                 }
                 Section {
@@ -41,7 +45,7 @@ struct NewSetView: View {
     }
 
     private var placement: String {
-        let where_ = notebook.map { "‘\($0.title)’ 단어장에 들어가요. " } ?? ""
+        let where_ = notebook.map { "‘\($0.title)’ 단어장(\(language.label))에 들어가요. " } ?? ""
         return where_ + "다음 화면에서 CSV·엑셀·텍스트·마크다운을 붙여넣거나 파일로 불러와 단어를 한 번에 추가할 수 있어요."
     }
 

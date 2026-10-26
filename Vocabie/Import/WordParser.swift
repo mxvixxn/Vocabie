@@ -69,6 +69,7 @@ enum WordParser {
             let line = rawLine.trimmed
             guard !line.isEmpty else { continue }
             guard !isMarkdownSeparator(line) else { continue }
+            guard !isQuestionNumber(line) else { continue }
 
             if isSectionHeader(line) {
                 if !current.rows.isEmpty { sections.append(current) }
@@ -291,7 +292,10 @@ enum WordParser {
     /// Importance marks and bullets. Asterisks and stars come in runs and often sit
     /// tight against the word (`**sentient`), so the space is optional for them; a
     /// dash needs one, or it would eat the hyphen off a term like `-ology`.
-    private static let markerPrefix = #"^(?:[*★☆✦•·]+\s*|[-–—]\s+)"#
+    /// A markdown heading (`## 18번`) opens the same way — copied out of a note, the
+    /// hashes are decoration, and without them the line would land in the deck as a
+    /// word instead of a set heading.
+    private static let markerPrefix = #"^(?:[*★☆✦•·]+\s*|#{1,6}\s+|[-–—]\s+)"#
 
     /// Numbered lists: "1. term …", "12) term …"
     private static let numberingPrefix = #"^\d+[.)]\s+"#
@@ -311,6 +315,24 @@ enum WordParser {
         guard s.range(of: sectionHeading, options: .regularExpression) != nil else { return false }
         return !s.contains { $0.isWordLetter }
     }
+
+    /// A mock-exam question number that rode along with the paste — `18번`, `43~45번`,
+    /// a bare `18`, `## 20` out of Notion or Obsidian.
+    ///
+    /// Not a set name: the learner has already named the set (`18-25`) for the range
+    /// they are studying, and the per-question numbers inside it are noise. So these
+    /// lines are dropped outright — they neither become a card nor break the paste
+    /// into a new section. Lesson-style headings (`3강`, `2과`) still title a set;
+    /// those are how a textbook chunks material, which is the boundary a learner wants.
+    private static func isQuestionNumber(_ line: String) -> Bool {
+        let s = stripBullet(line)
+        guard s.contains(where: { $0.isNumber }) else { return false }
+        // Only digits, a range mark, brackets and a tally — nothing that reads as a name.
+        return s.range(of: questionNumberOnly, options: .regularExpression) != nil
+    }
+
+    private static let questionNumberOnly =
+        #"^[\[\(（【<]?\s*\d+\s*(?:[~∼〜～\-–—]\s*\d+\s*)?[\]\)）】>]?\s*(?:번)?\s*(?:[\(（]\s*\d+\s*[\)）])?\s*$"#
 
     /// A heading turned into a set title: numbering and decoration stripped, and the
     /// trailing tally a mock-exam listing carries — `43~45번 (13)` — dropped, since 13

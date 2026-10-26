@@ -42,7 +42,12 @@ struct StudyScaffold<Stage: View, Panel: View>: View {
     }
 }
 
-/// The floating pill: close button, progress track, cleared count.
+/// The floating pill: close button, progress track, position count.
+///
+/// `cleared` is the *position* of the card on screen, counting from 1 — not the number
+/// finished. A learner reads "3/10" as "I'm on the third word", and a pass that ended
+/// on 9/10 felt like it stopped one short. The bar beside it still tracks work done,
+/// so it stays empty at the first card and only fills as words are cleared.
 struct StudyTopPill: View {
     let cleared: Int
     let total: Int
@@ -163,8 +168,11 @@ struct WordStage: View {
     var size: CGFloat = 38
     /// Draws a hint of a card stack behind the word so 암기 still reads as flippable.
     var stacked: Bool = false
-    /// English text to pronounce. `nil` hides the speaker button.
+    /// The term to pronounce. `nil` hides the speaker button.
     var speaks: String?
+    /// Which voice reads it. A plain string, not the set — the study views hand
+    /// down values rather than model objects so a drag frame stays cheap.
+    var speaksVoice: String = StudyLanguage.english.voiceCode
 
     var body: some View {
         ZStack {
@@ -185,7 +193,7 @@ struct WordStage: View {
                     .lineLimit(3)
 
                 if let speaks, !speaks.trimmed.isEmpty {
-                    SpeakButton(text: speaks, accent: accent)
+                    SpeakButton(text: speaks, accent: accent, voice: speaksVoice)
                 }
 
                 if showsChrome && !note.isEmpty {
@@ -234,6 +242,7 @@ struct AnswerReveal: View {
     var note: String = ""
     /// The mode's colour, for the term line and its speaker.
     let accent: Color
+    var voice: String = StudyLanguage.english.voiceCode
 
     var body: some View {
         VStack(spacing: 10) {
@@ -253,7 +262,7 @@ struct AnswerReveal: View {
                     .foregroundStyle(accent)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                SpeakButton(text: term, accent: accent)
+                SpeakButton(text: term, accent: accent, voice: voice)
             }
 
             if !note.isEmpty {
@@ -272,6 +281,8 @@ struct AnswerReveal: View {
 struct SpeakButton: View {
     let text: String
     let accent: Color
+    /// BCP-47 tag of the voice — a card is read in its own set's language.
+    var voice: String = StudyLanguage.english.voiceCode
 
     // Read directly — @Observable tracks the property access inside `body`.
     private var speaker: Speaker { Speaker.shared }
@@ -279,7 +290,7 @@ struct SpeakButton: View {
     var body: some View {
         Button {
             Haptics.soft()
-            speaker.speak(text)
+            speaker.speak(text, language: voice)
         } label: {
             Image(systemName: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
                 .font(.system(size: 17, weight: .semibold))
@@ -345,5 +356,162 @@ struct StudyCompleteView: View {
                 PanelButton(title: "끝내기", action: onClose)
             }
         }
+    }
+}
+
+// MARK: - Looking back
+
+/// Swipe-left-to-look-back, for the modes that don't have 암기's card deck.
+///
+/// 리콜 / 스펠 answer one card at a time and drop it — the word that just went by is
+/// gone, which is exactly when a learner wants another look at it. This adds the same
+/// affordance the deck has, as a gesture on the stage rather than a button, so nothing
+/// new sits on screen while the question is open.
+extension View {
+    func backSwipe(enabled: Bool, action: @escaping () -> Void) -> some View {
+        contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 24)
+                    .onEnded { value in
+                        guard enabled,
+                              value.translation.width < -60,
+                              abs(value.translation.height) < 90 else { return }
+                        Haptics.soft()
+                        action()
+                    }
+            )
+    }
+}
+
+/// The look-back sheet itself: the cards already answered, newest first.
+///
+/// Read-only on purpose. Re-answering a card from here would have to unpick the tallies,
+/// the streaks and the queue position it already earned; the learner asked to *see* the
+/// previous word, not to redo it.
+struct HistoryPeek: View {
+    /// Answered cards, oldest → newest.
+    let cards: [Vocab]
+    /// Which one is on screen; `nil` while closed.
+    @Binding var index: Int?
+    let accent: Color
+
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        if let i = index, cards.indices.contains(i) {
+            ZStack {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea()
+                    .onTapGesture { close() }
+
+                VStack(spacing: 0) {
+                    header(i)
+                    Spacer()
+                    card(cards[i])
+                        .id(cards[i].id)
+                        .transition(.opacity)
+                    Spacer()
+                    footer(i)
+                }
+            }
+            .transition(.opacity.combined(with: .scale(scale: 1.03)))
+            .gesture(
+                DragGesture(minimumDistance: 24)
+                    .onEnded { value in
+                        let dx = value.translation.width
+                        guard abs(dx) > 50 else { return }
+                        dx < 0 ? older() : newer()
+                    }
+            )
+        }
+    }
+
+    private func header(_ i: Int) -> some View {
+        HStack {
+            Text(stepLabel(i))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(accent)
+            Spacer()
+            Button {
+                Haptics.soft()
+                close()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("닫기")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+    }
+
+    private func card(_ word: Vocab) -> some View {
+        VStack(spacing: 12) {
+            Text("이전 단어")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(word.term)
+                .font(.system(size: 36, weight: .bold, design: .rounded))
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.45)
+                .lineLimit(3)
+            SpeakButton(text: word.term, accent: accent, voice: word.voiceCode)
+            Text(word.meaning)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.6)
+                .lineLimit(3)
+            if !word.note.isEmpty {
+                Text(word.note)
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, 26)
+    }
+
+    private func footer(_ i: Int) -> some View {
+        HStack(spacing: 10) {
+            PanelButton(title: "더 이전", systemImage: "chevron.left", action: older)
+                .disabled(i == 0)
+                .opacity(i == 0 ? 0.4 : 1)
+            PanelButton(title: i == cards.count - 1 ? "돌아가기" : "다음",
+                        systemImage: "chevron.right",
+                        fill: accent, solid: true, action: newer)
+        }
+        .padding(.horizontal, Theme.floatInset)
+        .padding(.bottom, 16)
+    }
+
+    /// "바로 전 단어" for the newest, then how many steps back it sits.
+    private func stepLabel(_ i: Int) -> String {
+        let back = cards.count - i
+        return back <= 1 ? "바로 전 단어" : "\(back)번째 전 단어"
+    }
+
+    private func older() {
+        guard let i = index, i > 0 else { return }
+        Haptics.selection()
+        withAnimation(.easeInOut(duration: 0.2)) { index = i - 1 }
+    }
+
+    /// Stepping forward past the newest card returns to the question.
+    private func newer() {
+        guard let i = index else { return }
+        Haptics.selection()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            index = i + 1 < cards.count ? i + 1 : nil
+        }
+    }
+
+    private func close() {
+        withAnimation(.easeInOut(duration: 0.2)) { index = nil }
     }
 }

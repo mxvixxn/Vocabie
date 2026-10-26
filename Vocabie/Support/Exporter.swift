@@ -83,8 +83,11 @@ enum Exporter {
             // The file lists sets in library order, so its position *is* the order.
             set.order = index
             if let name = payload.notebook, !name.trimmed.isEmpty {
+                // The language rides along on each set in the file, but it lives on
+                // the 단어장 — the first set to name a shelf decides its language.
+                let language = payload.language.flatMap(StudyLanguage.init(rawValue:)) ?? .english
                 let notebook = notebooks[name] ?? {
-                    let made = Notebook(title: name)
+                    let made = Notebook(title: name, language: language)
                     context.insert(made)
                     notebooks[name] = made
                     return made
@@ -158,6 +161,9 @@ extension Exporter {
         /// name rather than by id: the backup is a flat list of sets, and a name is
         /// the thing a learner would recognise if they ever opened the file.
         var notebook: String?
+        /// Optional so a backup written before languages existed still decodes;
+        /// those sets restore as 영어, the same default a new set carries.
+        var language: String?
         var words: [WordPayload]
 
         init(_ set: VocabSet) {
@@ -167,6 +173,7 @@ extension Exporter {
             createdAt = set.createdAt
             updatedAt = set.updatedAt
             notebook = set.notebook?.title
+            language = set.language.rawValue
             words = set.orderedWords.map(WordPayload.init)
         }
     }
@@ -181,6 +188,10 @@ extension Exporter {
         var memorizeSeen: Bool
         var recallStreak: Int
         var spellStreak: Int
+        // Optional so a backup written before the direction split still decodes.
+        var memorizeSeenReverse: Bool?
+        var recallStreakReverse: Int?
+        var spellStreakReverse: Int?
         var timesCorrect: Int
         var timesWrong: Int
         var lastStudied: Date?
@@ -199,6 +210,9 @@ extension Exporter {
             memorizeSeen = card.memorizeSeen
             recallStreak = card.recallStreak
             spellStreak = card.spellStreak
+            memorizeSeenReverse = card.memorizeSeenReverse
+            recallStreakReverse = card.recallStreakReverse
+            spellStreakReverse = card.spellStreakReverse
             timesCorrect = card.timesCorrect
             timesWrong = card.timesWrong
             lastStudied = card.lastStudied
@@ -215,6 +229,9 @@ extension Exporter {
             card.memorizeSeen = memorizeSeen
             card.recallStreak = recallStreak
             card.spellStreak = spellStreak
+            card.memorizeSeenReverse = memorizeSeenReverse ?? false
+            card.recallStreakReverse = recallStreakReverse ?? 0
+            card.spellStreakReverse = spellStreakReverse ?? 0
             card.timesCorrect = timesCorrect
             card.timesWrong = timesWrong
             card.lastStudied = lastStudied

@@ -13,10 +13,26 @@ struct NewNotebookView: View {
 
     @State private var title = ""
     @State private var detail = ""
+    /// Set once, for every 세트 that will land on this shelf. It decides the voice
+    /// each card is read in and whether 스펠 is offered.
+    @State private var language: StudyLanguage = .english
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("언어") {
+                    Picker("언어", selection: $language) {
+                        ForEach(StudyLanguage.allCases) { lang in
+                            Text(lang.label).tag(lang)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    if !language.supportsSpell {
+                        Text(language.spellUnavailableReason)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Section("단어장 정보") {
                     TextField("제목 (예: 모의고사 단어 정리)", text: $title)
                     TextField("메모 (선택)", text: $detail)
@@ -42,7 +58,7 @@ struct NewNotebookView: View {
     }
 
     private func create() {
-        let notebook = Notebook(title: title.trimmed, detail: detail.trimmed)
+        let notebook = Notebook(title: title.trimmed, detail: detail.trimmed, language: language)
         context.insert(notebook)
         try? context.save()
         Haptics.success()

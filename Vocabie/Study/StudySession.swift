@@ -21,6 +21,11 @@ final class StudySession {
     /// Misses per card this session — the input to spaced-repetition grading.
     private var misses: [UUID: Int] = [:]
 
+    /// Cards already answered this session, newest last — what the back-swipe walks.
+    /// A review-only trail: looking back never re-opens a card for answering, so the
+    /// queue and the tallies stay exactly as the learner left them.
+    private(set) var history: [Vocab] = []
+
     /// Multiple-choice options for the current recall card (empty for spell).
     private(set) var options: [String] = []
 
@@ -115,6 +120,7 @@ final class StudySession {
 
     private func grade(isCorrect: Bool) {
         guard let card = current else { return }
+        appendHistory(card)
 
         if isCorrect {
             card.recordCorrect()
@@ -141,11 +147,12 @@ final class StudySession {
     }
 
     private func bumpStreak(_ card: Vocab, up: Bool) {
+        // Scored against the direction being studied — 뜻 → 영단어 is its own skill.
         switch mode {
         case .recall:
-            card.recallStreak = up ? card.recallStreak + 1 : 0
+            card.setRecallStreak(up ? card.recallStreak(direction) + 1 : 0, direction)
         case .spell:
-            card.spellStreak = up ? card.spellStreak + 1 : 0
+            card.setSpellStreak(up ? card.spellStreak(direction) + 1 : 0, direction)
         case .memorize:
             break
         }
@@ -159,6 +166,14 @@ final class StudySession {
             return
         }
         prepareCurrent()
+    }
+
+    /// Keep the trail free of consecutive duplicates — a missed card answered again
+    /// right away would otherwise show up twice in a row when swiping back.
+    private func appendHistory(_ card: Vocab) {
+        if history.last?.id == card.id { return }
+        history.append(card)
+        if history.count > 60 { history.removeFirst(history.count - 60) }
     }
 
     private func prepareCurrent() {

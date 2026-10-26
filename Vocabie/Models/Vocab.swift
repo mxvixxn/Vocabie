@@ -18,12 +18,23 @@ final class Vocab {
 
     // MARK: Per-mode mastery tracking
 
-    /// Whether the card has been seen at least once in 암기 (Memorize).
+    // Tracked per direction: knowing 영단어 → 뜻 is not the same skill as producing the
+    // word from its meaning, so each direction earns its own stars. The unsuffixed
+    // fields are 영단어 → 뜻 (what every card already carried before the split).
+
+    /// Whether the card has been seen at least once in 암기 (Memorize), 영단어 → 뜻.
     var memorizeSeen: Bool = false
-    /// Consecutive correct answers in 리콜 (Recall).
+    /// Consecutive correct answers in 리콜 (Recall), 영단어 → 뜻.
     var recallStreak: Int = 0
-    /// Consecutive correct answers in 스펠 (Spell).
+    /// Consecutive correct answers in 스펠 (Spell), 영단어 → 뜻.
     var spellStreak: Int = 0
+
+    /// 암기 seen in the 뜻 → 영단어 direction.
+    var memorizeSeenReverse: Bool = false
+    /// 리콜 streak in the 뜻 → 영단어 direction.
+    var recallStreakReverse: Int = 0
+    /// 스펠 streak in the 뜻 → 영단어 direction.
+    var spellStreakReverse: Int = 0
 
     /// Lifetime tallies for the stats view.
     var timesCorrect: Int = 0
@@ -62,6 +73,13 @@ final class Vocab {
 }
 
 extension Vocab {
+    /// The voice this card is read in — taken from its set, so a mixed review still
+    /// pronounces each word in its own language.
+    var voiceCode: String { self.set?.language.voiceCode ?? StudyLanguage.english.voiceCode }
+
+    /// Whether this card can be asked for in 스펠 — decided by its set's language.
+    var voiceSupportsSpell: Bool { self.set?.language.supportsSpell ?? true }
+
     /// Key used to decide whether two cards are "the same word" — case- and
     /// whitespace-insensitive on the term. Used to spot duplicates when adding words.
     static func dedupKey(_ term: String) -> String {
@@ -70,14 +88,45 @@ extension Vocab {
 
     var dedupKey: String { Vocab.dedupKey(term) }
 
-    /// Overall mastery, 0...3 stars.
+    /// Mastery in one direction, 0...3 stars.
     /// One star for having been seen, one for a recall streak, one for a spell streak.
-    var starRating: Int {
+    func starRating(for direction: StudyDirection) -> Int {
         var stars = 0
-        if memorizeSeen { stars += 1 }
-        if recallStreak >= 1 { stars += 1 }
-        if spellStreak >= 1 { stars += 1 }
+        if memorizeSeen(direction) { stars += 1 }
+        if recallStreak(direction) >= 1 { stars += 1 }
+        if spellStreak(direction) >= 1 { stars += 1 }
         return stars
+    }
+
+    /// Mastery across both directions, 0...6 — what set- and shelf-level progress counts.
+    var starRating: Int {
+        StudyDirection.allCases.reduce(0) { $0 + starRating(for: $1) }
+    }
+
+    // MARK: Per-direction accessors
+
+    func memorizeSeen(_ d: StudyDirection) -> Bool {
+        d == .termToMeaning ? memorizeSeen : memorizeSeenReverse
+    }
+
+    func recallStreak(_ d: StudyDirection) -> Int {
+        d == .termToMeaning ? recallStreak : recallStreakReverse
+    }
+
+    func spellStreak(_ d: StudyDirection) -> Int {
+        d == .termToMeaning ? spellStreak : spellStreakReverse
+    }
+
+    func setMemorizeSeen(_ value: Bool, _ d: StudyDirection) {
+        if d == .termToMeaning { memorizeSeen = value } else { memorizeSeenReverse = value }
+    }
+
+    func setRecallStreak(_ value: Int, _ d: StudyDirection) {
+        if d == .termToMeaning { recallStreak = value } else { recallStreakReverse = value }
+    }
+
+    func setSpellStreak(_ value: Int, _ d: StudyDirection) {
+        if d == .termToMeaning { spellStreak = value } else { spellStreakReverse = value }
     }
 
     func recordCorrect() {
